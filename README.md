@@ -1,0 +1,1 @@
+# StageCore-ESP32-Camera
