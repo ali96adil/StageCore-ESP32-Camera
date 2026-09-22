@@ -1,3 +1,4 @@
+#ifndef STAGECORE_STREAM_FIRMWARE
 // StageCore ESP32-CAM: initial hardware probe, not a live streaming firmware.
 // Assumes the standard AI Thinker camera pin map pending physical qualification.
 // No Wi-Fi credentials or network services are used in this build.
@@ -105,3 +106,5 @@ void loop() {
   }
   delay(5000);
 }
+
+#endif  // !STAGECORE_STREAM_FIRMWARE
