@@ -1,14 +1,14 @@
 # Physical qualification — ESP32-CAM -> four tablets
 
-Status: checklist only. **No tests have been executed.** Record firmware commit, StageCore/relay commit, APK version, board revision, antenna, power source, router/AP settings, date, and the observed results for every run.
+Status: **camera serial bring-up PASS from user-reported physical logs (2026-09-22)**. Relay and four-tablet physical qualification remain NOT RUN. Record firmware commit, StageCore/relay commit, APK version, board revision, antenna, power source, router/AP settings, date, and observed results for each run.
 
 ## Bench bring-up (camera)
 
-- [ ] Confirm module, camera sensor, flash size, PSRAM, and pin mapping.
+- [x] Confirm module, camera sensor, flash size, PSRAM, and pin mapping (see `docs/hardware-profile.md`).
 - [ ] Confirm regulated supply and USB/serial flasher voltage levels.
-- [ ] Verify boot, camera init, stable Wi-Fi, identity, mDNS and IP fallback.
-- [ ] Check `health` fields and recover after Wi-Fi/power interruption.
-- [ ] Measure source frame rate, frame sizes, dropped frames, and latency.
+- [x] Verify serial boot and camera init. Wi-Fi, identity, mDNS and IP fallback are NOT RUN.
+- [ ] Check `health` fields and recover after Wi-Fi/power interruption (not implemented yet).
+- [ ] Measure streaming source frame rate, frame sizes, dropped frames, and latency (ten VGA JPEG capture frames succeeded in the serial probe, not a streaming performance test).
 
 ## Relay
 

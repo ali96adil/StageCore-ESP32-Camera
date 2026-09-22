@@ -49,8 +49,8 @@ void initializeCamera() {
   config.pin_pclk = kPclk;
   config.pin_vsync = kVsync;
   config.pin_href = kHref;
-  config.pin_sscb_sda = kSiod;
-  config.pin_sscb_scl = kSioc;
+  config.pin_sccb_sda = kSiod;
+  config.pin_sccb_scl = kSioc;
   config.pin_pwdn = kPwdn;
   config.pin_reset = kReset;
   config.xclk_freq_hz = 20000000;
