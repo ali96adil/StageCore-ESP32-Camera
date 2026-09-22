@@ -7,7 +7,7 @@
 - First boot: creates a WPA2 setup AP called StageCore-CAM-XXXXXX. A random 16-character setup password is printed **only on the local serial monitor**. Neither network credential is committed.
 - Join that AP and open http://192.168.4.1/setup; enter the show's 2.4 GHz Wi-Fi SSID and password. Credentials are stored in NVS. After reboot, firmware connects as a STA; a 20-second initial connect timeout or 45-second sustained disconnect leads to AP setup fallback.
 - On connected Wi-Fi: health on port 80 at /api/v0/health; MJPEG on port 81 at /api/v0/stream. Separate server workers keep health accessible while the stream is active.
-- A single active JPEG stream consumer is allowed. A second active connection is refused with 503; use StageCore Media Relay for four tablets.
+- A single active JPEG stream consumer is allowed. A second active connection is not supported; the single HTTP stream worker can leave additional clients waiting or timing out instead of returning an immediate 503. Use StageCore Media Relay for four tablets.
 - Stable camera ID derived from the interface MAC suffix; mDNS hostname and _stagecore-camera._tcp service on port 80 with stream-port=81 TXT. A configured IP remains a fallback.
 - Nominal VGA 640x480 with PSRAM, JPEG quality 12 and approximately 80ms between frames. These are settings, not verified FPS/latency guarantees.
 
