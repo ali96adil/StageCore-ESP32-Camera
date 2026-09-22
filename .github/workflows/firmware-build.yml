@@ -21,6 +21,15 @@ jobs:
         run: python -m pip install platformio==6.1.18
       - name: Build serial hardware probe
         run: pio run -e esp32cam_probe
+      - name: Build unqualified Wi-Fi MJPEG firmware
+        run: pio run -e esp32cam_stream
+      - name: Upload unqualified stream binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: esp32cam-stream-unqualified
+          path: .pio/build/esp32cam_stream/firmware.bin
+          if-no-files-found: error
+          retention-days: 7
       - name: Upload unqualified probe binary
         uses: actions/upload-artifact@v4
         with:
