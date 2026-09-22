@@ -1,6 +1,6 @@
 # Wi-Fi MJPEG bring-up — v0.1.0-dev.1
 
-**Status:** development firmware. CI build alone does not prove functional Wi-Fi, MJPEG, relay or four-tablet playback. Serial-only probe remains a separate PlatformIO environment.
+**Status:** development firmware. Owner's 2026-09-22 physical smoke test PASS: boot, camera init, first-run AP provisioning, STA Wi-Fi, health response and one-browser MJPEG display. Continuous streaming, recovery, relay and four-tablet playback remain NOT RUN. Serial-only probe remains a separate PlatformIO environment.
 
 ## Implemented by this build
 
@@ -35,7 +35,7 @@ Once local serial prints the assigned URL, check:
 
     curl --max-time 5 http://<camera-ip>/api/v0/health
 
-Then open http://<camera-ip>:81/api/v0/stream in a browser for **one viewer**. Close the browser before relay testing. Capture stream behavior, Wi-Fi RSSI, disconnect recovery, FPS, brownout and reset logs.
+Then open http://<camera-ip>:81/api/v0/stream in a browser for **one viewer**. Close the browser before relay testing. Initial smoke: browser playback reported working; health showed RSSI -67 dBm. Next capture stream behavior, Wi-Fi RSSI at show location, disconnect recovery, measured FPS, brownout and reset logs. A health query with `stream_active=false` made at a different time does not establish that stream state reporting is correct while the browser is connected.
 
 ## Security and limitations
 
