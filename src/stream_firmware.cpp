@@ -17,6 +17,16 @@ constexpr uint16_t kStreamPort = 81;
 constexpr uint32_t kConnectTimeoutMs = 20000;
 constexpr uint32_t kReconnectTimeoutMs = 45000;
 constexpr uint32_t kFrameIntervalMs = 80;  // Target ceiling ~12.5 FPS, not guaranteed.
+// Opt-in SVGA experiment: baseline stream and factory configuration are unchanged.
+#if defined(STAGECORE_CAM_SVGA_TRIAL)
+constexpr framesize_t kPsramFrameSize = FRAMESIZE_SVGA;
+constexpr unsigned kPsramFrameWidth = 800;
+constexpr unsigned kPsramFrameHeight = 600;
+#else
+constexpr framesize_t kPsramFrameSize = FRAMESIZE_VGA;
+constexpr unsigned kPsramFrameWidth = 640;
+constexpr unsigned kPsramFrameHeight = 480;
+#endif
 constexpr char kBoundary[] = "stagecoreframe";
 constexpr char kFirmwareVersion[] = "0.1.0-dev.1";
 
@@ -55,7 +65,7 @@ camera_config_t makeCameraConfig() {
   config.pin_reset = -1;
   config.xclk_freq_hz = 20000000;
   config.pixel_format = PIXFORMAT_JPEG;
-  config.frame_size = psramFound() ? FRAMESIZE_VGA : FRAMESIZE_QVGA;
+  config.frame_size = psramFound() ? kPsramFrameSize : FRAMESIZE_QVGA;
   config.jpeg_quality = 12;
   config.fb_count = psramFound() ? 2 : 1;
   config.fb_location = psramFound() ? CAMERA_FB_IN_PSRAM : CAMERA_FB_IN_DRAM;
@@ -85,8 +95,8 @@ esp_err_t healthHandler(httpd_req_t* req) {
            "\"wifi\":{\"rssi_dbm\":%ld},\"uptime_s\":%lu,"
            "\"stream_active\":%s}",
            cameraId.c_str(), kFirmwareVersion, state,
-           cameraReady ? (psramFound() ? 640U : 320U) : 0U,
-           cameraReady ? (psramFound() ? 480U : 240U) : 0U,
+           cameraReady ? (psramFound() ? kPsramFrameWidth : 320U) : 0U,
+           cameraReady ? (psramFound() ? kPsramFrameHeight : 240U) : 0U,
            static_cast<long>(WiFi.RSSI()),
            static_cast<unsigned long>(millis() / 1000UL),
            streamActive.load() ? "true" : "false");
