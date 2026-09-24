@@ -23,6 +23,15 @@ jobs:
         run: pio run -e esp32cam_probe
       - name: Build unqualified Wi-Fi MJPEG firmware
         run: pio run -e esp32cam_stream
+      - name: Build experimental SVGA MJPEG firmware
+        run: pio run -e esp32cam_stream_svga_trial
+      - name: Upload experimental SVGA trial binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: esp32cam-svga-trial-unqualified
+          path: .pio/build/esp32cam_stream_svga_trial/firmware.bin
+          if-no-files-found: error
+          retention-days: 7
       - name: Upload unqualified stream binary
         uses: actions/upload-artifact@v4
         with:
