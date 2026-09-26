@@ -1,11 +1,12 @@
 # Wi-Fi MJPEG bring-up — v0.1.0-dev.1
 
-**Status:** development firmware. Owner's 2026-09-22 physical smoke test PASS: boot, camera init, first-run AP provisioning, STA Wi-Fi, health response and one-browser MJPEG display. Continuous streaming, recovery, relay and four-tablet playback remain NOT RUN. Serial-only probe remains a separate PlatformIO environment.
+**Status:** development firmware. Owner's 2026-09-22 physical smoke test PASS: boot, camera init, first-run AP provisioning, STA Wi-Fi, health response and one-browser MJPEG display. Continuous streaming and four-tablet playback remain only partially qualified; the new automatic Wi-Fi recovery behavior is source/CI work until an attended outage test passes. Serial-only probe remains a separate PlatformIO environment.
 
 ## Implemented by this build
 
 - First boot: creates a WPA2 setup AP called StageCore-CAM-XXXXXX. A random 16-character setup password is printed **only on the local serial monitor**. Neither network credential is committed.
-- Join that AP and open http://192.168.4.1/setup; enter the show's 2.4 GHz Wi-Fi SSID and password. Credentials are stored in NVS. After reboot, firmware connects as a STA; a 20-second initial connect timeout or 45-second sustained disconnect leads to AP setup fallback.
+- Join that AP and open http://192.168.4.1/setup; enter the show's 2.4 GHz Wi-Fi SSID and password. Credentials are stored in NVS. After reboot, firmware connects as a STA. If the saved network is temporarily unavailable, the camera stays in saved-network recovery and retries with bounded exponential backoff instead of forgetting the network or requiring re-entry.
+- After 3 minutes continuously offline, a temporary recovery AP is exposed while STA retries continue. If the original show network returns, the camera automatically removes the recovery AP, restores mDNS/health/MJPEG, and permits the relay to reconnect. The setup form remains available for genuinely changed credentials.
 - On connected Wi-Fi: health on port 80 at /api/v0/health; MJPEG on port 81 at /api/v0/stream. Separate server workers keep health accessible while the stream is active.
 - A single active JPEG stream consumer is allowed. A second active connection is not supported; the single HTTP stream worker can leave additional clients waiting or timing out instead of returning an immediate 503. Use StageCore Media Relay for four tablets.
 - Stable camera ID derived from the interface MAC suffix; mDNS hostname and _stagecore-camera._tcp service on port 80 with stream-port=81 TXT. A configured IP remains a fallback.
