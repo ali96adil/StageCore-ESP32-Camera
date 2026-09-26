@@ -11,11 +11,11 @@
 #include <esp_system.h>
 #include <atomic>
 
+#include "wifi_recovery_policy.h"
+
 namespace {
 constexpr uint16_t kControlPort = 80;
 constexpr uint16_t kStreamPort = 81;
-constexpr uint32_t kConnectTimeoutMs = 20000;
-constexpr uint32_t kReconnectTimeoutMs = 45000;
 constexpr uint32_t kFrameIntervalMs = 80;  // Target ceiling ~12.5 FPS, not guaranteed.
 constexpr char kBoundary[] = "stagecoreframe";
 constexpr char kFirmwareVersion[] = "0.1.0-dev.1";
@@ -27,10 +27,18 @@ httpd_handle_t controlServer = nullptr;
 httpd_handle_t streamServer = nullptr;
 std::atomic<bool> streamActive{false};
 bool cameraReady = false;
-bool provisioning = false;
+bool setupPortalActive = false;
+bool recoveryPortalActive = false;
+bool networkServicesStarted = false;
+bool hasSavedCredentials = false;
+bool offlineActive = false;
 bool rebootRequested = false;
+String savedSsid;
+String savedPassword;
 unsigned long rebootAtMs = 0;
-unsigned long disconnectedSinceMs = 0;
+unsigned long offlineSinceMs = 0;
+unsigned long lastReconnectAttemptMs = 0;
+uint32_t reconnectDelayMs = stagecore_camera::wifi_recovery::kReconnectInitialDelayMs;
 
 // Hardware probe passed with the AI Thinker pin mapping on the owner's board.
 camera_config_t makeCameraConfig() {
@@ -71,7 +79,7 @@ void sendText(httpd_req_t* req, const char* status, const char* mime,
 }
 
 esp_err_t healthHandler(httpd_req_t* req) {
-  if (provisioning || WiFi.status() != WL_CONNECTED) {
+  if (WiFi.status() != WL_CONNECTED) {
     sendText(req, "503 Service Unavailable", "text/plain", "not connected");
     return ESP_OK;
   }
@@ -95,7 +103,7 @@ esp_err_t healthHandler(httpd_req_t* req) {
 }
 
 esp_err_t streamHandler(httpd_req_t* req) {
-  if (provisioning || !cameraReady || WiFi.status() != WL_CONNECTED) {
+  if (!cameraReady || WiFi.status() != WL_CONNECTED) {
     sendText(req, "503 Service Unavailable", "text/plain", "camera unavailable");
     return ESP_OK;
   }
@@ -108,7 +116,7 @@ esp_err_t streamHandler(httpd_req_t* req) {
   httpd_resp_set_type(req, "multipart/x-mixed-replace;boundary=stagecoreframe");
   httpd_resp_set_hdr(req, "Cache-Control", "no-store");
   esp_err_t err = ESP_OK;
-  while (WiFi.status() == WL_CONNECTED && !provisioning && err == ESP_OK) {
+  while (WiFi.status() == WL_CONNECTED && err == ESP_OK) {
     camera_fb_t* frame = esp_camera_fb_get();
     if (frame == nullptr) {
       Serial.println("camera capture failed; closing stream");
@@ -185,7 +193,7 @@ bool formField(const String& body, const char* key, String& result) {
 }
 
 esp_err_t setupPageHandler(httpd_req_t* req) {
-  if (!provisioning) {
+  if (!setupPortalActive) {
     sendText(req, "404 Not Found", "text/plain", "not found");
     return ESP_OK;
   }
@@ -209,7 +217,7 @@ esp_err_t setupPageHandler(httpd_req_t* req) {
 }
 
 esp_err_t setupSaveHandler(httpd_req_t* req) {
-  if (!provisioning) {
+  if (!setupPortalActive) {
     sendText(req, "404 Not Found", "text/plain", "not found");
     return ESP_OK;
   }
@@ -305,29 +313,65 @@ void stopServers() {
   }
 }
 
-void startProvisioning() {
+void stopNetworkServices() {
   stopServers();
   MDNS.end();
-  WiFi.disconnect(true);
-  WiFi.mode(WIFI_AP);
+  networkServicesStarted = false;
+  streamActive.store(false);
+}
+
+void startSetupPortal(bool recovery) {
+  stopNetworkServices();
+  if (recovery) {
+    WiFi.mode(WIFI_AP_STA);
+  } else {
+    WiFi.disconnect(true);
+    WiFi.mode(WIFI_AP);
+  }
+
   char randomPassword[17];
   snprintf(randomPassword, sizeof(randomPassword), "%08lx%08lx",
            static_cast<unsigned long>(esp_random()),
            static_cast<unsigned long>(esp_random()));
-  const String apSsid = "StageCore-CAM-" + cameraId.substring(cameraId.length() - 6);
-  provisioning = true;
+  const String apSsid =
+      "StageCore-CAM-" + cameraId.substring(cameraId.length() - 6);
+  setupPortalActive = true;
+  recoveryPortalActive = recovery;
   const bool apOk = WiFi.softAP(apSsid.c_str(), randomPassword);
-  Serial.printf("provisioning_ap=%s\n", apOk ? apSsid.c_str() : "FAILED");
+  Serial.printf("%s_ap=%s\n",
+                recovery ? "recovery" : "provisioning",
+                apOk ? apSsid.c_str() : "FAILED");
   if (apOk) {
-    Serial.printf("provisioning_password=%s\n", randomPassword);
-    Serial.println("provisioning_url=http://192.168.4.1/setup");
+    Serial.printf("%s_password=%s\n",
+                  recovery ? "recovery" : "provisioning",
+                  randomPassword);
+    Serial.println("setup_url=http://192.168.4.1/setup");
   }
-  Serial.printf("control_server=%s\n", startControlServer() ? "ready" : "FAILED");
+  Serial.printf("control_server=%s\n",
+                startControlServer() ? "ready" : "FAILED");
+}
+
+void beginStationAttempt() {
+  WiFi.mode(recoveryPortalActive ? WIFI_AP_STA : WIFI_STA);
+  WiFi.setHostname(hostName.c_str());
+  WiFi.setSleep(false);
+  WiFi.setAutoReconnect(false);
+  WiFi.begin(savedSsid.c_str(), savedPassword.c_str());
+  lastReconnectAttemptMs = millis();
+  Serial.println("wifi_reconnect_attempt");
 }
 
 void startConnected() {
-  provisioning = false;
-  disconnectedSinceMs = 0;
+  stopNetworkServices();
+  if (setupPortalActive) {
+    WiFi.softAPdisconnect(false);
+    WiFi.mode(WIFI_STA);
+  }
+  setupPortalActive = false;
+  recoveryPortalActive = false;
+  offlineActive = false;
+  reconnectDelayMs = stagecore_camera::wifi_recovery::kReconnectInitialDelayMs;
+
   MDNS.begin(hostName.c_str());
   MDNS.addService("stagecore-camera", "tcp", kControlPort);
   MDNS.addServiceTxt("stagecore-camera", "tcp", "stream-port", "81");
@@ -336,37 +380,83 @@ void startConnected() {
                 WiFi.localIP().toString().c_str());
   Serial.printf("stream=http://%s:81/api/v0/stream\n",
                 WiFi.localIP().toString().c_str());
-  Serial.printf("control_server=%s\n", startControlServer() ? "ready" : "FAILED");
-  Serial.printf("stream_server=%s\n", startStreamServer() ? "ready" : "FAILED");
+  const bool controlReady = startControlServer();
+  const bool streamReady = startStreamServer();
+  networkServicesStarted = controlReady || streamReady;
+  Serial.printf("control_server=%s\n", controlReady ? "ready" : "FAILED");
+  Serial.printf("stream_server=%s\n", streamReady ? "ready" : "FAILED");
 }
 
 void connectOrProvision() {
   preferences.begin("stagecore-cam", true);
-  const String ssid = preferences.getString("ssid", "");
-  const String password = preferences.getString("password", "");
+  savedSsid = preferences.getString("ssid", "");
+  savedPassword = preferences.getString("password", "");
   preferences.end();
-  if (ssid.isEmpty()) {
-    startProvisioning();
+
+  hasSavedCredentials = !savedSsid.isEmpty();
+  if (!hasSavedCredentials) {
+    startSetupPortal(false);
     return;
   }
-  WiFi.mode(WIFI_STA);
-  WiFi.setHostname(hostName.c_str());
-  WiFi.setSleep(false);
-  WiFi.setAutoReconnect(true);
-  WiFi.begin(ssid.c_str(), password.c_str());
-  Serial.println("wifi_connecting");
+
+  beginStationAttempt();
+  Serial.println("wifi_connecting_saved_network");
   const unsigned long start = millis();
-  while (WiFi.status() != WL_CONNECTED &&
-         (millis() - start) < kConnectTimeoutMs) {
+  while (WiFi.status() != WL_CONNECTED
+      && stagecore_camera::wifi_recovery::elapsed(millis(), start)
+          < stagecore_camera::wifi_recovery::kInitialConnectTimeoutMs) {
     delay(200);
   }
+
   if (WiFi.status() == WL_CONNECTED) {
     startConnected();
-  } else {
-    Serial.println("wifi_connect_timeout; entering local setup");
-    startProvisioning();
+    return;
+  }
+
+  offlineActive = true;
+  offlineSinceMs = millis();
+  lastReconnectAttemptMs = millis();
+  reconnectDelayMs = stagecore_camera::wifi_recovery::kReconnectInitialDelayMs;
+  Serial.println("wifi_connect_timeout; saved-network recovery active");
+}
+
+void maintainSavedWifi() {
+  if (!hasSavedCredentials) return;
+
+  if (WiFi.status() == WL_CONNECTED) {
+    if (!networkServicesStarted) startConnected();
+    return;
+  }
+
+  const uint32_t now = millis();
+  if (!offlineActive) {
+    offlineActive = true;
+    offlineSinceMs = now;
+    reconnectDelayMs =
+        stagecore_camera::wifi_recovery::kReconnectInitialDelayMs;
+    lastReconnectAttemptMs = now - reconnectDelayMs;
+    if (networkServicesStarted) {
+      Serial.println("wifi_lost; fencing MJPEG and local services");
+      stopNetworkServices();
+    }
+  }
+
+  if (stagecore_camera::wifi_recovery::recovery_portal_due(
+          now, offlineSinceMs, recoveryPortalActive)) {
+    Serial.println("wifi_recovery_portal_start");
+    startSetupPortal(true);
+    lastReconnectAttemptMs = now - reconnectDelayMs;
+  }
+
+  if (stagecore_camera::wifi_recovery::reconnect_due(
+          now, lastReconnectAttemptMs, reconnectDelayMs)) {
+    beginStationAttempt();
+    reconnectDelayMs =
+        stagecore_camera::wifi_recovery::next_reconnect_delay(
+            reconnectDelayMs);
   }
 }
+
 }  // namespace
 
 void setup() {
@@ -394,17 +484,7 @@ void loop() {
   if (rebootRequested && (millis() - rebootAtMs) > 1500) {
     ESP.restart();
   }
-  if (!provisioning) {
-    if (WiFi.status() == WL_CONNECTED) {
-      disconnectedSinceMs = 0;
-    } else {
-      if (disconnectedSinceMs == 0) disconnectedSinceMs = millis();
-      if (millis() - disconnectedSinceMs > kReconnectTimeoutMs) {
-        Serial.println("wifi_lost; entering local setup");
-        startProvisioning();
-      }
-    }
-  }
+  maintainSavedWifi();
   delay(250);
 }
 #endif
