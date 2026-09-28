@@ -2,7 +2,7 @@
 
 ESP32-CAM firmware for StageCore's live stage-camera source. This repository owns **camera-side firmware only**. It does not contain the StageCore Hub, Media Relay, or Android tablet player.
 
-> Status: foundation / proposed v0.1 contract. No working firmware, relay, APK integration, or physical qualification is claimed yet.
+> Status: the serial-only hardware probe **physically passed** on the owner's camera. A separate development Wi-Fi/MJPEG firmware is under CI and awaits physical streaming qualification. StageCore relay and Android integration are not implemented by this repository.
 
 ## Intended live path
 
@@ -18,13 +18,18 @@ The separate relay should ingest one stream and fan out the **same JPEG frames**
 
 ## Scope
 
-- Camera identity and safe local Wi-Fi provisioning
+- Camera identity and temporary password-protected local Wi-Fi provisioning
 - MJPEG HTTP stream, adjustable capture settings, status/health
 - Local network discovery (mDNS), reconnect, and recovery
 - Future authenticated OTA update support
 - Explicit compatibility contract for the StageCore camera adapter
 
 The StageCore repository owns relay/discovery orchestration and cue actions. The existing Android tablet application's repository owns local playback, hidden preloading, show/hide, freeze-last-frame, and error fallback. This repository should not duplicate them.
+
+## Available build targets
+
+- `esp32cam_probe`: serial hardware probe, already physically qualified on the photographed unit.
+- `esp32cam_stream`: proposed single-consumer HTTP MJPEG + local Wi-Fi provisioning; see [Wi-Fi/MJPEG bring-up](docs/wifi-mjpeg-bringup.md). **Do not infer physical streaming PASS from CI compilation.**
 
 ## First milestone
 
