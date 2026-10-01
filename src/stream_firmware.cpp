@@ -17,6 +17,7 @@ namespace {
 constexpr uint16_t kControlPort = 80;
 constexpr uint16_t kStreamPort = 81;
 constexpr uint32_t kFrameIntervalMs = 80;  // Target ceiling ~12.5 FPS, not guaranteed.
+constexpr uint8_t kFlashPin = 4;  // AI Thinker ESP32-CAM built-in white flash LED.
 constexpr char kBoundary[] = "stagecoreframe";
 constexpr char kFirmwareVersion[] = "0.1.0-dev.1";
 
@@ -26,6 +27,7 @@ Preferences preferences;
 httpd_handle_t controlServer = nullptr;
 httpd_handle_t streamServer = nullptr;
 std::atomic<bool> streamActive{false};
+std::atomic<bool> flashOn{false};
 bool cameraReady = false;
 bool setupPortalActive = false;
 bool recoveryPortalActive = false;
@@ -78,6 +80,46 @@ void sendText(httpd_req_t* req, const char* status, const char* mime,
   httpd_resp_sendstr(req, body);
 }
 
+void setFlash(bool enabled) {
+  digitalWrite(kFlashPin, enabled ? HIGH : LOW);
+  flashOn.store(enabled);
+}
+
+esp_err_t flashHandler(httpd_req_t* req) {
+  if (setupPortalActive || WiFi.status() != WL_CONNECTED) {
+    sendText(req, "503 Service Unavailable", "application/json",
+             "{\"error\":\"camera control unavailable\"}");
+    return ESP_OK;
+  }
+
+  char query[48] = {};
+  if (httpd_req_get_url_query_str(req, query, sizeof(query)) != ESP_OK) {
+    sendText(req, "400 Bad Request", "application/json",
+             "{\"error\":\"expected state=on or state=off\"}");
+    return ESP_OK;
+  }
+
+  char state[8] = {};
+  if (httpd_query_key_value(query, "state", state, sizeof(state)) != ESP_OK) {
+    sendText(req, "400 Bad Request", "application/json",
+             "{\"error\":\"expected state=on or state=off\"}");
+    return ESP_OK;
+  }
+
+  const bool turnOn = strcmp(state, "on") == 0;
+  const bool turnOff = strcmp(state, "off") == 0;
+  if (!turnOn && !turnOff) {
+    sendText(req, "400 Bad Request", "application/json",
+             "{\"error\":\"state must be on or off\"}");
+    return ESP_OK;
+  }
+
+  setFlash(turnOn);
+  sendText(req, "200 OK", "application/json",
+           turnOn ? "{\"flash_on\":true}" : "{\"flash_on\":false}");
+  return ESP_OK;
+}
+
 esp_err_t healthHandler(httpd_req_t* req) {
   if (WiFi.status() != WL_CONNECTED) {
     sendText(req, "503 Service Unavailable", "text/plain", "not connected");
@@ -91,13 +133,14 @@ esp_err_t healthHandler(httpd_req_t* req) {
            "\"stream\":{\"path\":\"/api/v0/stream\",\"port\":81,"
            "\"format\":\"mjpeg\",\"width\":%u,\"height\":%u,\"target_fps\":12},"
            "\"wifi\":{\"rssi_dbm\":%ld},\"uptime_s\":%lu,"
-           "\"stream_active\":%s}",
+           "\"stream_active\":%s,\"flash_on\":%s}",
            cameraId.c_str(), kFirmwareVersion, state,
            cameraReady ? (psramFound() ? 640U : 320U) : 0U,
            cameraReady ? (psramFound() ? 480U : 240U) : 0U,
            static_cast<long>(WiFi.RSSI()),
            static_cast<unsigned long>(millis() / 1000UL),
-           streamActive.load() ? "true" : "false");
+           streamActive.load() ? "true" : "false",
+           flashOn.load() ? "true" : "false");
   sendText(req, "200 OK", "application/json", json);
   return ESP_OK;
 }
@@ -265,7 +308,7 @@ esp_err_t setupSaveHandler(httpd_req_t* req) {
 bool startControlServer() {
   httpd_config_t config = HTTPD_DEFAULT_CONFIG();
   config.server_port = kControlPort;
-  config.max_uri_handlers = 4;
+  config.max_uri_handlers = 5;
   config.stack_size = 8192;
   if (httpd_start(&controlServer, &config) != ESP_OK) return false;
   httpd_uri_t health = {};
@@ -273,6 +316,11 @@ bool startControlServer() {
   health.method = HTTP_GET;
   health.handler = healthHandler;
   httpd_register_uri_handler(controlServer, &health);
+  httpd_uri_t flash = {};
+  flash.uri = "/api/v0/flash";
+  flash.method = HTTP_POST;
+  flash.handler = flashHandler;
+  httpd_register_uri_handler(controlServer, &flash);
   httpd_uri_t setup = {};
   setup.uri = "/setup";
   setup.method = HTTP_GET;
@@ -314,6 +362,8 @@ void stopServers() {
 }
 
 void stopNetworkServices() {
+  // Fail safe: network/control loss must never leave the stage flash latched on.
+  setFlash(false);
   stopServers();
   MDNS.end();
   networkServicesStarted = false;
@@ -463,6 +513,8 @@ void setup() {
   Serial.begin(115200);
   delay(1200);
   Serial.println("\nSTAGECORE_CAM_STREAM_v0");
+  pinMode(kFlashPin, OUTPUT);
+  setFlash(false);
   WiFi.mode(WIFI_STA);
   String mac = WiFi.macAddress();
   mac.replace(":", "");
