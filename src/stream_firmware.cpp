@@ -10,6 +10,7 @@
 #include <esp_http_server.h>
 #include <esp_system.h>
 #include <atomic>
+#include <cstring>
 
 #include "wifi_recovery_policy.h"
 
