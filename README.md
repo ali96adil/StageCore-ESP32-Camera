@@ -20,6 +20,7 @@ The separate relay should ingest one stream and fan out the **same JPEG frames**
 
 - Camera identity and temporary password-protected local Wi-Fi provisioning
 - MJPEG HTTP stream, adjustable capture settings, status/health
+- Built-in AI Thinker white flash LED control on GPIO 4 through a bounded local HTTP endpoint; default/fail-safe state is OFF
 - Local network discovery (mDNS), reconnect, and recovery
 - Future authenticated OTA update support
 - Explicit compatibility contract for the StageCore camera adapter
@@ -46,3 +47,11 @@ Configuration secrets, Wi-Fi passwords, and device-local data **must not** be co
 - [StageCore](https://github.com/ali96adil/StageCore) — control plane and future media relay.
 
 No Flash/OTA instructions are provided until the board profile, partition layout, and rollback strategy are validated.
+
+## Live-view flash control candidate
+
+The stream firmware exposes `POST /api/v0/flash?state=on|off` on the camera control port. Camera health reports `flash_on`.
+
+This endpoint is intentionally local show-LAN control and is not public-internet authentication. The StageCore Pi relay is expected to be the caller: first downstream Live viewer requests ON, and the final viewer leaving requests OFF. Do **not** tie the light to `stream_active`, because the relay holds its single upstream MJPEG connection even when no tablets are viewing.
+
+The firmware initializes GPIO 4 LOW and forces the flash OFF when camera network services are fenced. Source/CI evidence does not qualify the real LED; the exact firmware must still be flashed and physically observed before first-show promotion.
