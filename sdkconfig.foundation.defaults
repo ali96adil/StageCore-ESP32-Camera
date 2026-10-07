@@ -1,0 +1,18 @@
+# StageCore ESP32-CAM secure Foundation candidate.
+# CI/source candidate only; does not replace the proven Arduino stream image.
+
+CONFIG_ESP_MAIN_TASK_STACK_SIZE=8192
+CONFIG_LOG_DEFAULT_LEVEL_INFO=y
+
+CONFIG_MBEDTLS_SSL_PROTO_TLS1_3=y
+CONFIG_MBEDTLS_SSL_TLS1_3_KEXM_EPHEMERAL=y
+CONFIG_MBEDTLS_SSL_TLS1_3_COMPATIBILITY_MODE=y
+CONFIG_ESP_TLS_CLIENT_SESSION_TICKETS=y
+
+# Credential-free TLS preflight captures the discovered Hub certificate and
+# verifies its advertised SHA-256 before any credential is sent.
+CONFIG_ESP_TLS_INSECURE=y
+CONFIG_ESP_TLS_SKIP_SERVER_CERT_VERIFY=y
+
+CONFIG_PARTITION_TABLE_SINGLE_APP_LARGE=y
+CONFIG_ESPTOOLPY_FLASHSIZE_4MB=y
