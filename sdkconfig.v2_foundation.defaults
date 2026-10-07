@@ -1,0 +1,19 @@
+# StageCore ESP32 Camera — secure Firmware Foundation C1 candidate.
+CONFIG_ESP_MAIN_TASK_STACK_SIZE=8192
+CONFIG_LOG_DEFAULT_LEVEL_INFO=y
+
+# StageCore secure device gateway requires TLS 1.3.
+CONFIG_MBEDTLS_SSL_PROTO_TLS1_3=y
+CONFIG_MBEDTLS_SSL_TLS1_3_KEXM_EPHEMERAL=y
+CONFIG_MBEDTLS_SSL_TLS1_3_COMPATIBILITY_MODE=y
+CONFIG_ESP_TLS_CLIENT_SESSION_TICKETS=y
+
+# Credential-free TLS preflight captures the peer certificate, then validates
+# its SHA-256 against the StageCore Bonjour advertisement before any
+# credential is sent. Subsequent HTTP/WebSocket connections use that DER cert.
+CONFIG_ESP_TLS_INSECURE=y
+CONFIG_ESP_TLS_SKIP_SERVER_CERT_VERIFY=y
+
+# The physical ESP32-CAM probe reported 4 MB flash.
+CONFIG_ESPTOOLPY_FLASHSIZE_4MB=y
+CONFIG_PARTITION_TABLE_SINGLE_APP_LARGE=y
