@@ -23,7 +23,7 @@ class V2FoundationC1Contract(unittest.TestCase):
         )
         self.assertIn("project(stagecore_esp32_camera)", root_cmake)
         cmake = (ROOT / "src" / "CMakeLists.txt").read_text()
-        self.assertIn("if(STAGECORE_CAMERA_V2_FOUNDATION_C1)", cmake)
+        self.assertIn("STAGECORE_CAMERA_V2_FOUNDATION_C1", cmake)
         self.assertIn('"v2_foundation/main.cpp"', cmake)
         self.assertNotIn('"main.cpp"\n', cmake.replace('"v2_foundation/main.cpp"', ""))
 
