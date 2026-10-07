@@ -46,3 +46,7 @@ Configuration secrets, Wi-Fi passwords, and device-local data **must not** be co
 - [StageCore](https://github.com/ali96adil/StageCore) — control plane and future media relay.
 
 No Flash/OTA instructions are provided until the board profile, partition layout, and rollback strategy are validated.
+
+## Setup Wi-Fi access point
+
+First-run provisioning and saved-network recovery use a device-specific camera SSID with the shared StageCore setup password `StageCoreSetup`. Serial Monitor is no longer required to discover a random AP password. The password may be overridden at build time with `STAGECORE_SETUP_AP_PASSWORD`; keep the same value across StageCore devices when using that override.

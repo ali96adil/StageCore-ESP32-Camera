@@ -21,6 +21,15 @@ constexpr uint32_t kFrameIntervalMs = 80;  // Target ceiling ~12.5 FPS, not guar
 constexpr char kBoundary[] = "stagecoreframe";
 constexpr char kFirmwareVersion[] = "0.1.0-dev.1";
 
+#ifndef STAGECORE_SETUP_AP_PASSWORD
+#define STAGECORE_SETUP_AP_PASSWORD "StageCoreSetup"
+#endif
+
+constexpr char kSetupApPassword[] = STAGECORE_SETUP_AP_PASSWORD;
+static_assert(sizeof(kSetupApPassword) - 1 >= 8 &&
+                  sizeof(kSetupApPassword) - 1 <= 63,
+              "StageCore setup AP password must be 8-63 bytes");
+
 String cameraId;
 String hostName;
 Preferences preferences;
@@ -379,22 +388,18 @@ void startSetupPortal(bool recovery) {
     WiFi.mode(WIFI_AP);
   }
 
-  char randomPassword[17];
-  snprintf(randomPassword, sizeof(randomPassword), "%08lx%08lx",
-           static_cast<unsigned long>(esp_random()),
-           static_cast<unsigned long>(esp_random()));
   const String apSsid =
       "StageCore-CAM-" + cameraId.substring(cameraId.length() - 6);
   setupPortalActive = true;
   recoveryPortalActive = recovery;
-  const bool apOk = WiFi.softAP(apSsid.c_str(), randomPassword);
+  const bool apOk = WiFi.softAP(apSsid.c_str(), kSetupApPassword);
   Serial.printf("%s_ap=%s\n",
                 recovery ? "recovery" : "provisioning",
                 apOk ? apSsid.c_str() : "FAILED");
   if (apOk) {
     Serial.printf("%s_password=%s\n",
                   recovery ? "recovery" : "provisioning",
-                  randomPassword);
+                  kSetupApPassword);
     Serial.println("setup_url=http://192.168.4.1/setup");
   }
   Serial.printf("control_server=%s\n",
