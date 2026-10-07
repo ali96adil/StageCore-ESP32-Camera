@@ -77,7 +77,7 @@ esp_err_t connect_station(const WifiConfig &config, int timeout_ms) {
   err = esp_wifi_set_mode(WIFI_MODE_STA);
   if (err == ESP_OK) err = esp_wifi_set_config(WIFI_IF_STA, &wifi);
   if (err == ESP_OK) err = esp_wifi_start();
-  if (err != ESP_OK && err != ESP_ERR_WIFI_CONN) return err;
+  if (err != ESP_OK) return err;
 
   return wait_for_station_connection(timeout_ms);
 }
