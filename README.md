@@ -49,4 +49,4 @@ No Flash/OTA instructions are provided until the board profile, partition layout
 
 ## Setup Wi-Fi access point
 
-First-run provisioning and saved-network recovery use a device-specific camera SSID with the shared StageCore setup password `StageCoreSetup`. Serial Monitor is no longer required to discover a random AP password. The password may be overridden at build time with `STAGECORE_SETUP_AP_PASSWORD`; keep the same value across StageCore devices when using that override.
+First-run provisioning and saved-network recovery use a device-specific camera SSID with the shared StageCore setup password `12345678`. Serial Monitor is no longer required to discover a random AP password. The password may be overridden at build time with `STAGECORE_SETUP_AP_PASSWORD`; keep the same value across StageCore devices when using that override.

@@ -7,7 +7,7 @@ ROOT = Path(__file__).resolve().parents[1]
 class ProvisioningContract(unittest.TestCase):
     def test_setup_and_recovery_use_shared_password(self):
         source = (ROOT / "src" / "stream_firmware.cpp").read_text()
-        self.assertIn('#define STAGECORE_SETUP_AP_PASSWORD "StageCoreSetup"', source)
+        self.assertIn('#define STAGECORE_SETUP_AP_PASSWORD "12345678"', source)
         self.assertIn("kSetupApPassword", source)
         self.assertIn("WiFi.softAP(apSsid.c_str(), kSetupApPassword)", source)
         self.assertNotIn("randomPassword", source)
