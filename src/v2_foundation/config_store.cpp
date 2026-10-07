@@ -4,7 +4,7 @@
 
 #include "nvs.h"
 
-namespace stagecore_camera_v2 {
+namespace stagecore {
 namespace {
 
 constexpr char kCameraNamespace[] = "stagecore-cam";
@@ -118,4 +118,4 @@ esp_err_t save_hub_binding(const HubBinding &binding) {
   return err;
 }
 
-}  // namespace stagecore_camera_v2
+}  // namespace stagecore
