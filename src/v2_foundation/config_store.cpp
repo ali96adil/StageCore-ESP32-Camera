@@ -1,5 +1,6 @@
 #include "config_store.h"
 
+#include <utility>
 #include <vector>
 
 #include "nvs.h"
