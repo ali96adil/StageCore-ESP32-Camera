@@ -2,7 +2,7 @@
 
 ESP32-CAM firmware for StageCore's live stage-camera source. This repository owns **camera-side firmware only**. It does not contain the StageCore Hub, Media Relay, or Android tablet player.
 
-> Status: the serial-only hardware probe **physically passed** on the owner's camera. A separate development Wi-Fi/MJPEG firmware is under CI and awaits physical streaming qualification. StageCore relay and Android integration are not implemented by this repository.
+> Status: the serial-only hardware probe and legacy Arduino one-viewer MJPEG smoke **physically passed** on the owner's camera. The unified authenticated ESP-IDF C3 image is source-qualified on main (CI #159 PASS) and now awaits attended physical qualification before replacing the proven show firmware.
 
 ## Intended live path
 
@@ -30,7 +30,10 @@ The StageCore repository owns relay/discovery orchestration and cue actions. The
 
 - `esp32cam_probe`: serial hardware probe, already physically qualified on the photographed unit.
 - `esp32cam_stream`: proposed single-consumer HTTP MJPEG + local Wi-Fi provisioning; see [Wi-Fi/MJPEG bring-up](docs/wifi-mjpeg-bringup.md). **Do not infer physical streaming PASS from CI compilation.**
-- `esp32cam_v2_foundation_c1`: **source-only, non-camera candidate** for persistent UUID/P-256 identity, pinned Hub trust, authenticated pairing, and inventory-only `stagecore.device/2`. It intentionally has no camera capture, MJPEG, flash-output, Setup-AP mutation, Cue, or show-authority path.
+- `esp32cam_v2_foundation_c1`: isolated authenticated inventory-only rollback candidate; no camera/output path.
+- `esp32cam_v2_foundation_c2`: adds authenticated Firmware Foundation maintenance, protected Setup/Recovery AP, managed AP password override/reset, and bounded reconnect; no camera/output path.
+- `esp32cam_v2_foundation_c3`: unified source-qualified candidate with C2 security/maintenance plus the proven AI Thinker OV2640 mapping, one-upstream MJPEG/relay contract, mDNS, health and flash-safe service. **Physical C3 qualification is still required.**
+- Attended C3 procedure: [docs/c3-physical-qualification.md](docs/c3-physical-qualification.md).
 
 ## First milestone
 
@@ -53,15 +56,15 @@ No Flash/OTA instructions are provided until the board profile, partition layout
 First-run provisioning and saved-network recovery use a device-specific camera SSID with the shared StageCore setup password `12345678`. Serial Monitor is no longer required to discover a random AP password. The password may be overridden at build time with `STAGECORE_SETUP_AP_PASSWORD`; keep the same value across StageCore devices when using that override.
 
 
-## Firmware Foundation migration
+## Firmware Foundation v1
 
-StageCore Firmware Foundation v1 is being integrated without replacing the
-physically proven rollback path. The current C1 candidate reads the Wi-Fi
-credentials already saved by `esp32cam_stream`, creates a persistent secure
-identity, pins one verified Hub, authenticates, and appears as a BLOCKER /
-UNASSIGNED v2 inventory device.
+Software migration is complete through C3 while preserving the proven Arduino
+stream image as rollback. C3 combines authenticated `stagecore.device/2`,
+managed Setup/Recovery AP password maintenance, protected first-run/recovery,
+bounded reconnect, the qualified AI Thinker/OV2640 pin map, one-upstream MJPEG,
+mDNS, health and flash-safe behavior.
 
-C1 deliberately does **not** advertise
-`device.maintenance.setup-ap-password`. That capability is added only after
-this secure transport is source-qualified; the existing unauthenticated camera
-HTTP server remains forbidden from changing the Setup/Recovery AP password.
+The camera HTTP service remains unable to mutate Wi-Fi or Setup/Recovery AP
+credentials. Password maintenance stays authenticated and separate from
+camera/flash/Cue/show authority. The remaining gate is attended C3 physical
+qualification, not additional Foundation implementation.

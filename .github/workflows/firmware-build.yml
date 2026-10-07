@@ -45,6 +45,8 @@ jobs:
         run: python -m unittest tests/v2_foundation_c2_contract_test.py -v
       - name: Test secure v2 Foundation C3 camera service contract
         run: python -m unittest tests/v2_foundation_c3_contract_test.py -v
+      - name: Test C3 physical smoke helper
+        run: python -m unittest tests/c3_physical_smoke_test.py -v
       - name: Build serial hardware probe
         run: pio run -e esp32cam_probe
       - name: Build unqualified Wi-Fi MJPEG firmware

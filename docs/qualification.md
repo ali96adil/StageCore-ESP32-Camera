@@ -1,6 +1,6 @@
 # Physical qualification — ESP32-CAM -> four tablets
 
-Status: **serial hardware probe and initial one-viewer local MJPEG smoke test PASS from user-reported logs (2026-09-22)**. Stream soak, network recovery, Relay, and four-tablet physical qualification remain NOT RUN. Record firmware commit, StageCore/relay commit, APK version, board revision, antenna, power source, router/AP settings, date, and observed results for each run.
+Status: **legacy serial hardware probe and Arduino one-viewer MJPEG smoke PASS; unified authenticated C3 is source-qualified but NOT physically qualified**. Camera main `e57392aa0f9867567b414838f148ac6c7e28b787` / CI #159 PASS. Use [c3-physical-qualification.md](c3-physical-qualification.md) for the next attended gate. Record firmware commit, StageCore/relay commit, APK version, board revision, antenna, power source, router/AP settings, date, and observed results for each run.
 
 ## Bench bring-up (camera)
 
