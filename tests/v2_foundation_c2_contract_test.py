@@ -62,6 +62,23 @@ class V2FoundationC2Contract(unittest.TestCase):
         self.assertNotIn("password=%s", portal)
         self.assertNotIn("temporary AP password", portal)
 
+    def test_c2_reconnect_uses_bounded_backoff(self):
+        network = (V2 / "network_station.cpp").read_text()
+        self.assertIn("esp_timer_start_once", network)
+        self.assertIn("kReconnectInitialDelayMs", network)
+        self.assertIn("next_reconnect_delay", network)
+        self.assertIn("schedule_reconnect();", network)
+        self.assertIn("#if STAGECORE_CAMERA_V2_FOUNDATION_C2", network)
+
+        disconnected = network.split(
+            "WIFI_EVENT_STA_DISCONNECTED", 1
+        )[1].split("IP_EVENT_STA_GOT_IP", 1)[0]
+        c2_branch = disconnected.split(
+            "#if STAGECORE_CAMERA_V2_FOUNDATION_C2", 1
+        )[1].split("#else", 1)[0]
+        self.assertIn("schedule_reconnect();", c2_branch)
+        self.assertNotIn("esp_wifi_connect()", c2_branch)
+
     def test_maintenance_remains_non_camera_non_flash_authority(self):
         runtime = (V2 / "stage_device_runtime.cpp").read_text()
         start = runtime.index("esp_err_t process_setup_ap_maintenance")
