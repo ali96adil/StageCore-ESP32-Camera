@@ -1,3 +1,4 @@
+#ifdef STAGECORE_FOUNDATION_V2_CANDIDATE
 #include <algorithm>
 #include <cstdio>
 #include <string>
@@ -202,3 +203,4 @@ extern "C" void app_main() {
     vTaskDelay(pdMS_TO_TICKS(2000));
   }
 }
+#endif  // STAGECORE_FOUNDATION_V2_CANDIDATE
