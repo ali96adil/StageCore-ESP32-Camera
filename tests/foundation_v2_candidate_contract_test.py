@@ -10,10 +10,15 @@ class FoundationV2CandidateContract(unittest.TestCase):
         self.assertIn("[env:esp32cam_stream]", ini)
         self.assertIn("[env:esp32cam_foundation_v2_candidate]", ini)
         self.assertIn("framework = espidf", ini)
-        self.assertIn("+<foundation_candidate.cpp>", ini)
+        self.assertIn("-DSTAGECORE_FOUNDATION_V2_CANDIDATE=1", ini)
 
         stream = (ROOT / "src" / "stream_firmware.cpp").read_text()
+        probe = (ROOT / "src" / "main.cpp").read_text()
         self.assertNotIn("STAGECORE_FOUNDATION_V2_CANDIDATE", stream)
+        self.assertIn("!defined(STAGECORE_FOUNDATION_V2_CANDIDATE)", probe)
+        for name in ("foundation_candidate.cpp", "foundation_identity.cpp", "foundation_hub.cpp", "foundation_runtime.cpp"):
+            source = (ROOT / "src" / name).read_text()
+            self.assertTrue(source.startswith("#ifdef STAGECORE_FOUNDATION_V2_CANDIDATE"))
 
     def test_candidate_is_authenticated_inventory_only(self):
         runtime = (ROOT / "src" / "foundation_runtime.cpp").read_text()
