@@ -3,7 +3,9 @@
 #include <array>
 #include <cctype>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
+#include <utility>
 #include <strings.h>
 #include <vector>
 
