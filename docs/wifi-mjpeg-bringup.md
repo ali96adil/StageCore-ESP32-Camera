@@ -1,10 +1,10 @@
-# Wi-Fi MJPEG bring-up — v0.1.0-dev.1
+# Legacy Arduino Wi-Fi MJPEG bring-up — v0.1.0-dev.1
 
-**Status:** development firmware. Owner's 2026-09-22 physical smoke test PASS: boot, camera init, first-run AP provisioning, STA Wi-Fi, health response and one-browser MJPEG display. Continuous streaming and four-tablet playback remain only partially qualified; the new automatic Wi-Fi recovery behavior is source/CI work until an attended outage test passes. Serial-only probe remains a separate PlatformIO environment.
+**Status:** retained rollback documentation. Owner's 2026-09-22 physical smoke test PASS: boot, camera init, first-run AP provisioning, STA Wi-Fi, health response and one-browser MJPEG display. The active migration target is now the unified authenticated ESP-IDF C3 image; use [c3-physical-qualification.md](c3-physical-qualification.md) for new qualification work.
 
 ## Implemented by this build
 
-- First boot: creates a WPA2 setup AP called StageCore-CAM-XXXXXX. A random 16-character setup password is printed **only on the local serial monitor**. Neither network credential is committed.
+- Current main/Foundation behavior: first-run and Recovery AP use a device-specific StageCore-CAM-XXXXXX SSID with the locally managed Setup/Recovery AP password override, or shared fallback `12345678`. This legacy document no longer describes the old random-password behavior.
 - Join that AP and open http://192.168.4.1/setup; enter the show's 2.4 GHz Wi-Fi SSID and password. Credentials are stored in NVS. After reboot, firmware connects as a STA. If the saved network is temporarily unavailable, the camera stays in saved-network recovery and retries with bounded exponential backoff instead of forgetting the network or requiring re-entry.
 - After 3 minutes continuously offline, a temporary recovery AP is exposed while STA retries continue. If the original show network returns, the camera automatically removes the recovery AP, restores mDNS/health/MJPEG, and permits the relay to reconnect. The setup form remains available for genuinely changed credentials.
 - On connected Wi-Fi: health on port 80 at /api/v0/health; MJPEG on port 81 at /api/v0/stream. Separate server workers keep health accessible while the stream is active.
@@ -30,7 +30,7 @@ Do not flash before matching CI passes. Flashing will replace the serial hardwar
 
 Serial port is an example only; reconnects may change it. Check ls /dev/cu.* first. Expected first line: STAGECORE_CAM_STREAM_v0.
 
-If the unit has no saved credentials, read its temporary setup AP password **locally** from the serial monitor, join the AP, browse to http://192.168.4.1/setup and save show-network credentials. Do not paste real network credentials into issues or chat. Rejoin the show Wi-Fi.
+If the unit has no saved credentials, join the protected Setup AP using the managed local override or shared fallback `12345678`, browse to the setup page and save the show-network credentials. Do not paste real network credentials into issues or chat. Rejoin the show Wi-Fi.
 
 Once local serial prints the assigned URL, check:
 
