@@ -11,4 +11,4 @@ secrets.*
 *.local.ini
 managed_components/
 dependencies.lock
-sdkconfig.esp32cam_foundation_v2_candidate
+sdkconfig.*
