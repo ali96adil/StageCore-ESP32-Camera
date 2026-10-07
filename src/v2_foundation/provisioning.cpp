@@ -1,5 +1,6 @@
 #include "provisioning.h"
 
+#include <algorithm>
 #include <cctype>
 #include <cstdio>
 #include <cstring>
