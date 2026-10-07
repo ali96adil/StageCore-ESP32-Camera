@@ -46,6 +46,7 @@ bool offlineActive = false;
 bool rebootRequested = false;
 String savedSsid;
 String savedPassword;
+String setupApPassword = kSetupApPassword;
 unsigned long rebootAtMs = 0;
 unsigned long offlineSinceMs = 0;
 unsigned long lastReconnectAttemptMs = 0;
@@ -262,6 +263,11 @@ esp_err_t setupPageHandler(httpd_req_t* req) {
       "<input id=\"ssid\" name=\"ssid\" maxlength=\"32\" required>"
       "<label for=\"password\">Wi-Fi password (leave empty for open Wi-Fi)</label>"
       "<input id=\"password\" name=\"password\" type=\"password\" maxlength=\"63\">"
+      "<label for=\"setup_ap_password\">Setup / Recovery AP password (optional)</label>"
+      "<input id=\"setup_ap_password\" name=\"setup_ap_password\" type=\"password\" "
+      "minlength=\"8\" maxlength=\"63\" autocomplete=\"new-password\">"
+      "<label><input type=\"checkbox\" name=\"reset_setup_ap\" value=\"1\"> "
+      "Reset Setup / Recovery AP password to shared default</label>"
       "<button type=\"submit\">Save and restart</button></form>"
       "<p>Use 2.4 GHz Wi-Fi. This temporary access point is only for setup.</p>"
       "</body></html>";
@@ -295,6 +301,12 @@ esp_err_t setupSaveHandler(httpd_req_t* req) {
   const String input(body);
   String ssid;
   String password;
+  String setupCredential;
+  String resetSetup;
+  const bool hasSetupCredential =
+      formField(input, "setup_ap_password", setupCredential);
+  const bool resetSetupCredential =
+      formField(input, "reset_setup_ap", resetSetup) && resetSetup == "1";
   if (!formField(input, "ssid", ssid) ||
       !formField(input, "password", password) ||
       ssid.length() == 0 || ssid.length() > 32 ||
@@ -307,6 +319,13 @@ esp_err_t setupSaveHandler(httpd_req_t* req) {
   preferences.begin("stagecore-cam", false);
   preferences.putString("ssid", ssid);
   preferences.putString("password", password);
+  if (resetSetupCredential) {
+    preferences.remove("setup_ap_pass");
+    setupApPassword = kSetupApPassword;
+  } else if (hasSetupCredential && setupCredential.length() != 0) {
+    preferences.putString("setup_ap_pass", setupCredential);
+    setupApPassword = setupCredential;
+  }
   preferences.end();
   sendText(req, "200 OK", "text/html",
            "<p>Saved. Camera restarting; connect your device to the show Wi-Fi.</p>");
@@ -392,14 +411,11 @@ void startSetupPortal(bool recovery) {
       "StageCore-CAM-" + cameraId.substring(cameraId.length() - 6);
   setupPortalActive = true;
   recoveryPortalActive = recovery;
-  const bool apOk = WiFi.softAP(apSsid.c_str(), kSetupApPassword);
+  const bool apOk = WiFi.softAP(apSsid.c_str(), setupApPassword.c_str());
   Serial.printf("%s_ap=%s\n",
                 recovery ? "recovery" : "provisioning",
                 apOk ? apSsid.c_str() : "FAILED");
   if (apOk) {
-    Serial.printf("%s_password=%s\n",
-                  recovery ? "recovery" : "provisioning",
-                  kSetupApPassword);
     Serial.println("setup_url=http://192.168.4.1/setup");
   }
   Serial.printf("control_server=%s\n",
@@ -446,6 +462,11 @@ void connectOrProvision() {
   preferences.begin("stagecore-cam", true);
   savedSsid = preferences.getString("ssid", "");
   savedPassword = preferences.getString("password", "");
+  const String storedSetup = preferences.getString("setup_ap_pass", "");
+  setupApPassword =
+      storedSetup.length() >= 8 && storedSetup.length() <= 63
+          ? storedSetup
+          : String(kSetupApPassword);
   preferences.end();
 
   hasSavedCredentials = !savedSsid.isEmpty();
