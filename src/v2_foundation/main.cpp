@@ -16,6 +16,14 @@
 #define STAGECORE_CAMERA_V2_FOUNDATION_C2 0
 #endif
 
+#ifndef STAGECORE_CAMERA_V2_FOUNDATION_C3
+#define STAGECORE_CAMERA_V2_FOUNDATION_C3 0
+#endif
+
+#if STAGECORE_CAMERA_V2_FOUNDATION_C3
+#include "camera_service.h"
+#endif
+
 #if STAGECORE_CAMERA_V2_FOUNDATION_C2
 #include "provisioning.h"
 #include "wifi_recovery_policy.h"
@@ -85,6 +93,16 @@ extern "C" void app_main(void) {
            "no camera stream/flash execution",
            STAGECORE_FW_VERSION);
 
+#if STAGECORE_CAMERA_V2_FOUNDATION_C3
+  const esp_err_t camera_hardware =
+      stagecore::initialize_camera_hardware();
+  if (camera_hardware != ESP_OK) {
+    ESP_LOGW(kTag,
+             "camera hardware unavailable; v2 maintenance remains active: %s",
+             esp_err_to_name(camera_hardware));
+  }
+#endif
+
   stagecore::DeviceIdentity identity;
   if (identity.LoadOrCreate() != ESP_OK) {
     hold_safe_failure("persistent UUID/P-256 identity unavailable");
@@ -118,14 +136,34 @@ extern "C" void app_main(void) {
 #endif
   }
 
+#if STAGECORE_CAMERA_V2_FOUNDATION_C3
+  const esp_err_t camera_service =
+      stagecore::start_camera_network_services();
+  if (camera_service != ESP_OK) {
+    ESP_LOGW(kTag, "camera network service unavailable: %s",
+             esp_err_to_name(camera_service));
+  }
+#endif
+
   while (true) {
     if (stagecore::wait_for_station_connection(0) != ESP_OK) {
       ESP_LOGW(kTag, "Stage LAN disconnected; waiting for saved network");
+#if STAGECORE_CAMERA_V2_FOUNDATION_C3
+      stagecore::stop_camera_network_services();
+#endif
 #if STAGECORE_CAMERA_V2_FOUNDATION_C2
       wait_for_stage_lan_with_recovery(identity.device_id(), 0);
 #else
       while (stagecore::wait_for_station_connection(30000) != ESP_OK) {
         ESP_LOGW(kTag, "Stage LAN still unavailable");
+      }
+#endif
+#if STAGECORE_CAMERA_V2_FOUNDATION_C3
+      const esp_err_t restored_camera_service =
+          stagecore::start_camera_network_services();
+      if (restored_camera_service != ESP_OK) {
+        ESP_LOGW(kTag, "camera service restore failed: %s",
+                 esp_err_to_name(restored_camera_service));
       }
 #endif
     }

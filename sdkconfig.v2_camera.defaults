@@ -1,0 +1,10 @@
+# StageCore ESP32 Camera — C3 camera-service candidate.
+CONFIG_STAGECORE_CAMERA_C3=y
+
+# The physically-qualified AI Thinker board has ~4 MiB PSRAM. Keep the native
+# esp32-camera driver on the same 80 MHz PSRAM shape recommended by Espressif.
+CONFIG_SPIRAM=y
+CONFIG_SPIRAM_SUPPORT=y
+CONFIG_ESP32_SPIRAM_SUPPORT=y
+CONFIG_SPIRAM_SPEED_80M=y
+CONFIG_ESPTOOLPY_FLASHFREQ_80M=y

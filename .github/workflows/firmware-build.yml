@@ -43,6 +43,8 @@ jobs:
         run: python -m unittest tests/v2_foundation_contract_test.py -v
       - name: Test secure v2 Foundation C2 maintenance contract
         run: python -m unittest tests/v2_foundation_c2_contract_test.py -v
+      - name: Test secure v2 Foundation C3 camera service contract
+        run: python -m unittest tests/v2_foundation_c3_contract_test.py -v
       - name: Build serial hardware probe
         run: pio run -e esp32cam_probe
       - name: Build unqualified Wi-Fi MJPEG firmware
@@ -51,6 +53,12 @@ jobs:
         run: pio run -e esp32cam_v2_foundation_c1
       - name: Build source-only secure v2 Foundation C2 maintenance candidate
         run: pio run -e esp32cam_v2_foundation_c2
+      - name: Verify C1/C2 did not resolve the camera component
+        run: test ! -d managed_components/espressif__esp32-camera
+      - name: Build source-only secure v2 Foundation C3 camera service candidate
+        run: pio run -e esp32cam_v2_foundation_c3
+      - name: Verify C3 resolved the camera component
+        run: test -f managed_components/espressif__esp32-camera/idf_component.yml
       - name: Stage exact firmware artifacts
         shell: bash
         run: |
@@ -113,6 +121,30 @@ jobs:
             echo "setup_ap_maintenance=authenticated_v2"
           } > "$OUT/BUILDINFO"
 
+          ENV_NAME="esp32cam_v2_foundation_c3"
+          SRC=".pio/build/$ENV_NAME/firmware.bin"
+          test -f "$SRC"
+          OUT="$RUNNER_TEMP/$ENV_NAME"
+          rm -rf "$OUT"
+          mkdir -p "$OUT"
+          cp "$SRC" "$OUT/firmware.bin"
+          sha256sum "$OUT/firmware.bin" > "$OUT/SHA256SUMS"
+          {
+            echo "source_revision=$EXPECTED_SHA"
+            echo "platformio=6.1.18"
+            echo "environment=$ENV_NAME"
+            echo "board=esp32cam"
+            echo "framework=espidf"
+            echo "qualification=SOURCE_ONLY_C3"
+            echo "camera_component=espressif/esp32-camera@2.1.8"
+            echo "camera_stream=true"
+            echo "camera_stream_port=81"
+            echo "camera_relay_contract=one-upstream"
+            echo "flash_output=true-safe-default-off"
+            echo "physical_qualification=false"
+            echo "setup_ap_maintenance=authenticated_v2"
+          } > "$OUT/BUILDINFO"
+
           DIRTY="$(git status --porcelain --untracked-files=all)"
           if [ -n "$DIRTY" ]; then
             echo "::error::Build modified the source checkout:"
@@ -148,5 +180,13 @@ jobs:
         with:
           name: esp32cam-v2-foundation-c2-source-only
           path: ${{ runner.temp }}/esp32cam_v2_foundation_c2/
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload secure v2 Foundation C3 camera service candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: esp32cam-v2-foundation-c3-camera-source-only
+          path: ${{ runner.temp }}/esp32cam_v2_foundation_c3/
           if-no-files-found: error
           retention-days: 7
