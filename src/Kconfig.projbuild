@@ -1,0 +1,10 @@
+menu "StageCore Camera"
+
+config STAGECORE_CAMERA_C3
+    bool "Enable StageCore Camera C3 component dependency"
+    default n
+    help
+        Enables the pinned native esp32-camera component only for the C3
+        candidate. C1/C2 remain independent and camera-output free.
+
+endmenu

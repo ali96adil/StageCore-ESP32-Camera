@@ -1,0 +1,2 @@
+# StageCore ESP32 Camera — C3 camera-service scaffold.
+CONFIG_STAGECORE_CAMERA_C3=y
