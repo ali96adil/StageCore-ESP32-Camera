@@ -11,6 +11,9 @@ class FoundationV2CandidateContract(unittest.TestCase):
         self.assertIn("[env:esp32cam_foundation_v2_candidate]", ini)
         self.assertIn("framework = espidf", ini)
         self.assertIn("-DSTAGECORE_FOUNDATION_V2_CANDIDATE=1", ini)
+        self.assertIn("board_build.partitions = foundation_partitions.csv", ini)
+        partitions = (ROOT / "foundation_partitions.csv").read_text()
+        self.assertIn("1500K", partitions)
 
         stream = (ROOT / "src" / "stream_firmware.cpp").read_text()
         probe = (ROOT / "src" / "main.cpp").read_text()
