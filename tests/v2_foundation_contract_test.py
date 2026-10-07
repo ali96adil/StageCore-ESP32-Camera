@@ -16,6 +16,12 @@ class V2FoundationC1Contract(unittest.TestCase):
             "board_build.partitions = partitions_singleapp_large.csv",
             pio,
         )
+        root_cmake = (ROOT / "CMakeLists.txt").read_text()
+        self.assertIn(
+            "include($ENV{IDF_PATH}/tools/cmake/project.cmake)",
+            root_cmake,
+        )
+        self.assertIn("project(stagecore_esp32_camera)", root_cmake)
         cmake = (ROOT / "src" / "CMakeLists.txt").read_text()
         self.assertIn("if(STAGECORE_CAMERA_V2_FOUNDATION_C1)", cmake)
         self.assertIn('"v2_foundation/main.cpp"', cmake)
