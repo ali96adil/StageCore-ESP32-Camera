@@ -9,7 +9,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
 
-namespace stagecore_camera_v2 {
+namespace stagecore {
 namespace {
 
 constexpr char kTag[] = "stagecam-v2-net";
@@ -90,4 +90,4 @@ esp_err_t wait_for_station_connection(int timeout_ms) {
   return (bits & kConnectedBit) ? ESP_OK : ESP_ERR_TIMEOUT;
 }
 
-}  // namespace stagecore_camera_v2
+}  // namespace stagecore
