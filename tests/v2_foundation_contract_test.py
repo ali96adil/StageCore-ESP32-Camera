@@ -12,6 +12,10 @@ class V2FoundationC1Contract(unittest.TestCase):
         self.assertIn("framework = espidf", pio)
         self.assertIn("-<v2_foundation/>", pio)
         self.assertIn("-DSTAGECORE_CAMERA_V2_FOUNDATION_C1=ON", pio)
+        self.assertIn(
+            "board_build.partitions = partitions_singleapp_large.csv",
+            pio,
+        )
         cmake = (ROOT / "src" / "CMakeLists.txt").read_text()
         self.assertIn("if(STAGECORE_CAMERA_V2_FOUNDATION_C1)", cmake)
         self.assertIn('"v2_foundation/main.cpp"', cmake)
