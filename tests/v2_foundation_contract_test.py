@@ -11,7 +11,11 @@ class V2FoundationC1Contract(unittest.TestCase):
         self.assertIn("[env:esp32cam_v2_foundation_c1]", pio)
         self.assertIn("framework = espidf", pio)
         self.assertIn("-<v2_foundation/>", pio)
-        self.assertIn("+<v2_foundation/>", pio)
+        self.assertIn("-DSTAGECORE_CAMERA_V2_FOUNDATION_C1=ON", pio)
+        cmake = (ROOT / "src" / "CMakeLists.txt").read_text()
+        self.assertIn("if(STAGECORE_CAMERA_V2_FOUNDATION_C1)", cmake)
+        self.assertIn('"v2_foundation/main.cpp"', cmake)
+        self.assertNotIn('"main.cpp"\n', cmake.replace('"v2_foundation/main.cpp"', ""))
 
     def test_candidate_has_no_camera_or_flash_execution_path(self):
         source = "\n".join(
