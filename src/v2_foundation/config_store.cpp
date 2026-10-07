@@ -78,6 +78,18 @@ esp_err_t load_wifi_config(WifiConfig *config) {
   return err;
 }
 
+esp_err_t save_wifi_config(const WifiConfig &config) {
+  if (!config.complete()) return ESP_ERR_INVALID_ARG;
+  nvs_handle_t handle;
+  esp_err_t err = nvs_open(kCameraNamespace, NVS_READWRITE, &handle);
+  if (err != ESP_OK) return err;
+  err = write_string(handle, kSSIDKey, config.ssid);
+  if (err == ESP_OK) err = write_string(handle, kPasswordKey, config.password);
+  if (err == ESP_OK) err = nvs_commit(handle);
+  nvs_close(handle);
+  return err;
+}
+
 esp_err_t load_setup_ap_password(std::string *password) {
   if (password == nullptr) return ESP_ERR_INVALID_ARG;
   nvs_handle_t handle;

@@ -6,6 +6,7 @@
 #include <cstdio>
 #include <cstring>
 #include <string>
+#include <utility>
 
 #include "cJSON.h"
 #include "config_store.h"
@@ -515,6 +516,9 @@ esp_err_t run_camera_foundation_runtime(const VerifiedHub &hub,
 
   esp_websocket_client_handle_t client = esp_websocket_client_init(&config);
   if (client == nullptr) {
+#if STAGECORE_CAMERA_V2_FOUNDATION_C2
+    vSemaphoreDelete(context.maintenance_lock);
+#endif
     vEventGroupDelete(context.events);
     return ESP_ERR_NO_MEM;
   }
@@ -523,6 +527,9 @@ esp_err_t run_camera_foundation_runtime(const VerifiedHub &hub,
       client, WEBSOCKET_EVENT_ANY, &runtime_event_handler, &context);
   if (err != ESP_OK) {
     esp_websocket_client_destroy(client);
+#if STAGECORE_CAMERA_V2_FOUNDATION_C2
+    vSemaphoreDelete(context.maintenance_lock);
+#endif
     vEventGroupDelete(context.events);
     return err;
   }
@@ -530,6 +537,9 @@ esp_err_t run_camera_foundation_runtime(const VerifiedHub &hub,
   err = esp_websocket_client_start(client);
   if (err != ESP_OK) {
     esp_websocket_client_destroy(client);
+#if STAGECORE_CAMERA_V2_FOUNDATION_C2
+    vSemaphoreDelete(context.maintenance_lock);
+#endif
     vEventGroupDelete(context.events);
     return err;
   }

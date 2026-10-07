@@ -41,6 +41,27 @@ class V2FoundationC2Contract(unittest.TestCase):
         self.assertIn("clear_setup_ap_password", runtime)
         self.assertNotIn('cJSON_AddStringToObject(root, "password"', runtime)
 
+    def test_first_run_and_recovery_use_managed_or_fallback_ap_password(self):
+        portal = (V2 / "provisioning.cpp").read_text()
+        main = (V2 / "main.cpp").read_text()
+        store = (V2 / "config_store.cpp").read_text()
+        cmake = (ROOT / "src" / "CMakeLists.txt").read_text()
+
+        self.assertIn('#define STAGECORE_SETUP_AP_PASSWORD "12345678"', portal)
+        self.assertIn("effective_setup_ap_password", portal)
+        self.assertIn("load_setup_ap_password", portal)
+        self.assertIn("WIFI_AUTH_WPA2_PSK", portal)
+        self.assertIn("WIFI_MODE_APSTA", portal)
+        self.assertIn("save_wifi_config", portal)
+        self.assertIn("run_camera_provisioning_portal", main)
+        self.assertIn("run_camera_recovery_portal", main)
+        self.assertIn("kRecoveryPortalDelayMs", main)
+        self.assertIn("nvs_open(kCameraNamespace, NVS_READWRITE", store)
+        self.assertIn("if(STAGECORE_CAMERA_V2_FOUNDATION_C2)", cmake)
+        self.assertIn('"v2_foundation/provisioning.cpp"', cmake)
+        self.assertNotIn("password=%s", portal)
+        self.assertNotIn("temporary AP password", portal)
+
     def test_maintenance_remains_non_camera_non_flash_authority(self):
         runtime = (V2 / "stage_device_runtime.cpp").read_text()
         start = runtime.index("esp_err_t process_setup_ap_maintenance")
