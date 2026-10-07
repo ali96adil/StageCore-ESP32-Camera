@@ -1,3 +1,4 @@
+#include <cstdint>
 #include <string>
 
 #include "config_store.h"
@@ -11,20 +12,54 @@
 #include "nvs_flash.h"
 #include "stage_device_runtime.h"
 
+#ifndef STAGECORE_CAMERA_V2_FOUNDATION_C2
+#define STAGECORE_CAMERA_V2_FOUNDATION_C2 0
+#endif
+
+#if STAGECORE_CAMERA_V2_FOUNDATION_C2
+#include "provisioning.h"
+#include "wifi_recovery_policy.h"
+#endif
+
 #ifndef STAGECORE_FW_VERSION
 #define STAGECORE_FW_VERSION "0.2.0-dev.c1"
 #endif
 
 namespace {
 
-constexpr char kTag[] = "stagecam-v2-c1";
+constexpr char kTag[] = "stagecam-v2-foundation";
 
 [[noreturn]] void hold_safe_failure(const char *reason) {
   ESP_LOGE(kTag, "safe failure: %s", reason);
   ESP_LOGE(kTag,
-           "C1 contains no camera stream or flash-output execution path");
+           "Foundation candidate contains no camera stream or flash-output "
+           "execution path");
   while (true) vTaskDelay(pdMS_TO_TICKS(1000));
 }
+
+#if STAGECORE_CAMERA_V2_FOUNDATION_C2
+void wait_for_stage_lan_with_recovery(
+    const std::string &device_id,
+    uint32_t already_offline_ms) {
+  uint32_t offline_ms = already_offline_ms;
+  while (stagecore::wait_for_station_connection(30000) != ESP_OK) {
+    offline_ms += 30000;
+    ESP_LOGW(kTag, "Stage LAN still unavailable; offline_ms=%u",
+             static_cast<unsigned>(offline_ms));
+    if (offline_ms <
+        stagecore_camera::wifi_recovery::kRecoveryPortalDelayMs) {
+      continue;
+    }
+
+    const esp_err_t recovery =
+        stagecore::run_camera_recovery_portal(device_id);
+    if (recovery == ESP_OK) return;
+    ESP_LOGW(kTag, "Recovery AP ended with error: %s",
+             esp_err_to_name(recovery));
+    offline_ms = 0;
+  }
+}
+#endif
 
 std::string display_name(const std::string &device_id) {
   std::string suffix;
@@ -46,8 +81,8 @@ extern "C" void app_main(void) {
   }
 
   ESP_LOGW(kTag,
-           "StageCore ESP32 Camera secure Foundation C1 %s: "
-           "SOURCE-ONLY candidate; no camera stream/flash execution",
+           "StageCore ESP32 Camera secure Foundation candidate %s: "
+           "no camera stream/flash execution",
            STAGECORE_FW_VERSION);
 
   stagecore::DeviceIdentity identity;
@@ -62,22 +97,37 @@ extern "C" void app_main(void) {
     hold_safe_failure("existing Camera Wi-Fi configuration unavailable");
   }
   if (!wifi.complete()) {
+#if STAGECORE_CAMERA_V2_FOUNDATION_C2
+    stagecore::run_camera_provisioning_portal(identity.device_id());
+#else
     hold_safe_failure(
-        "no saved Camera Stage LAN credentials; provision with proven stream image first");
+        "no saved Camera Stage LAN credentials; provision with proven stream "
+        "image first");
+#endif
   }
 
   esp_err_t network = stagecore::connect_station(wifi, 30000);
-  while (network != ESP_OK) {
-    ESP_LOGW(kTag, "Stage LAN unavailable; inventory candidate remains inert");
-    network = stagecore::wait_for_station_connection(30000);
+  if (network != ESP_OK) {
+    ESP_LOGW(kTag, "Stage LAN unavailable; candidate remains non-output");
+#if STAGECORE_CAMERA_V2_FOUNDATION_C2
+    wait_for_stage_lan_with_recovery(identity.device_id(), 30000);
+#else
+    while (stagecore::wait_for_station_connection(30000) != ESP_OK) {
+      ESP_LOGW(kTag, "Stage LAN still unavailable");
+    }
+#endif
   }
 
   while (true) {
     if (stagecore::wait_for_station_connection(0) != ESP_OK) {
       ESP_LOGW(kTag, "Stage LAN disconnected; waiting for saved network");
+#if STAGECORE_CAMERA_V2_FOUNDATION_C2
+      wait_for_stage_lan_with_recovery(identity.device_id(), 0);
+#else
       while (stagecore::wait_for_station_connection(30000) != ESP_OK) {
         ESP_LOGW(kTag, "Stage LAN still unavailable");
       }
+#endif
     }
 
     stagecore::VerifiedHub hub;

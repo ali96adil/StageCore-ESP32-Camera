@@ -7,6 +7,10 @@ on:
   pull_request:
   workflow_dispatch:
 
+concurrency:
+  group: firmware-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   hardware-probe:
     runs-on: ubuntu-latest
@@ -37,12 +41,16 @@ jobs:
         run: python -m unittest tests/provisioning_contract_test.py -v
       - name: Test secure v2 Foundation C1 contract
         run: python -m unittest tests/v2_foundation_contract_test.py -v
+      - name: Test secure v2 Foundation C2 maintenance contract
+        run: python -m unittest tests/v2_foundation_c2_contract_test.py -v
       - name: Build serial hardware probe
         run: pio run -e esp32cam_probe
       - name: Build unqualified Wi-Fi MJPEG firmware
         run: pio run -e esp32cam_stream
       - name: Build source-only secure v2 Foundation C1 candidate
         run: pio run -e esp32cam_v2_foundation_c1
+      - name: Build source-only secure v2 Foundation C2 maintenance candidate
+        run: pio run -e esp32cam_v2_foundation_c2
       - name: Stage exact firmware artifacts
         shell: bash
         run: |
@@ -85,6 +93,26 @@ jobs:
             echo "flash_output=false"
           } > "$OUT/BUILDINFO"
 
+          ENV_NAME="esp32cam_v2_foundation_c2"
+          SRC=".pio/build/$ENV_NAME/firmware.bin"
+          test -f "$SRC"
+          OUT="$RUNNER_TEMP/$ENV_NAME"
+          rm -rf "$OUT"
+          mkdir -p "$OUT"
+          cp "$SRC" "$OUT/firmware.bin"
+          sha256sum "$OUT/firmware.bin" > "$OUT/SHA256SUMS"
+          {
+            echo "source_revision=$EXPECTED_SHA"
+            echo "platformio=6.1.18"
+            echo "environment=$ENV_NAME"
+            echo "board=esp32cam"
+            echo "framework=espidf"
+            echo "qualification=SOURCE_ONLY_C2"
+            echo "camera_stream=false"
+            echo "flash_output=false"
+            echo "setup_ap_maintenance=authenticated_v2"
+          } > "$OUT/BUILDINFO"
+
           DIRTY="$(git status --porcelain --untracked-files=all)"
           if [ -n "$DIRTY" ]; then
             echo "::error::Build modified the source checkout:"
@@ -111,5 +139,14 @@ jobs:
         with:
           name: esp32cam-v2-foundation-c1-source-only
           path: ${{ runner.temp }}/esp32cam_v2_foundation_c1/
+          if-no-files-found: error
+          retention-days: 7
+
+
+      - name: Upload secure v2 Foundation C2 maintenance candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: esp32cam-v2-foundation-c2-source-only
+          path: ${{ runner.temp }}/esp32cam_v2_foundation_c2/
           if-no-files-found: error
           retention-days: 7

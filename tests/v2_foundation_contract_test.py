@@ -23,7 +23,7 @@ class V2FoundationC1Contract(unittest.TestCase):
         )
         self.assertIn("project(stagecore_esp32_camera)", root_cmake)
         cmake = (ROOT / "src" / "CMakeLists.txt").read_text()
-        self.assertIn("if(STAGECORE_CAMERA_V2_FOUNDATION_C1)", cmake)
+        self.assertIn("STAGECORE_CAMERA_V2_FOUNDATION_C1", cmake)
         self.assertIn('"v2_foundation/main.cpp"', cmake)
         self.assertNotIn('"main.cpp"\n', cmake.replace('"v2_foundation/main.cpp"', ""))
 
@@ -61,15 +61,16 @@ class V2FoundationC1Contract(unittest.TestCase):
         self.assertIn("Authorization: StageCoreSession ", runtime)
         self.assertIn("certificate_pinned", runtime)
 
-    def test_c1_does_not_claim_foundation_maintenance_yet(self):
-        source = "\n".join(
-            path.read_text()
-            for path in V2.glob("*.*")
-            if path.is_file()
-        )
-        self.assertNotIn("device.maintenance.setup-ap-password", source)
-        self.assertNotIn("maintenance.setup_ap_password", source)
-        self.assertNotIn("setup_ap_pass", source)
+    def test_c1_does_not_enable_foundation_maintenance(self):
+        pio = (ROOT / "platformio.ini").read_text()
+        c1 = pio.split("[env:esp32cam_v2_foundation_c1]", 1)[1]
+        c1 = c1.split("[env:esp32cam_v2_foundation_c2]", 1)[0]
+        self.assertNotIn("STAGECORE_CAMERA_V2_FOUNDATION_C2", c1)
+
+        runtime = (V2 / "stage_device_runtime.cpp").read_text()
+        security = (V2 / "hub_security.cpp").read_text()
+        self.assertIn("#if STAGECORE_CAMERA_V2_FOUNDATION_C2", runtime)
+        self.assertIn("#if STAGECORE_CAMERA_V2_FOUNDATION_C2", security)
 
 
 if __name__ == "__main__":

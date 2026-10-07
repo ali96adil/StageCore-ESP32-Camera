@@ -9,6 +9,15 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
 
+#ifndef STAGECORE_CAMERA_V2_FOUNDATION_C2
+#define STAGECORE_CAMERA_V2_FOUNDATION_C2 0
+#endif
+
+#if STAGECORE_CAMERA_V2_FOUNDATION_C2
+#include "esp_timer.h"
+#include "wifi_recovery_policy.h"
+#endif
+
 namespace stagecore {
 namespace {
 
@@ -21,15 +30,70 @@ esp_event_handler_instance_t g_ip_handler = nullptr;
 bool g_handlers_registered = false;
 bool g_wifi_initialized = false;
 
+#if STAGECORE_CAMERA_V2_FOUNDATION_C2
+esp_timer_handle_t g_reconnect_timer = nullptr;
+uint32_t g_reconnect_delay_ms =
+    stagecore_camera::wifi_recovery::kReconnectInitialDelayMs;
+
+void stop_reconnect_timer() {
+  if (g_reconnect_timer == nullptr) return;
+  const esp_err_t err = esp_timer_stop(g_reconnect_timer);
+  if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) {
+    ESP_LOGW(kTag, "unable to stop reconnect timer: %s",
+             esp_err_to_name(err));
+  }
+}
+
+void reconnect_timer_callback(void *) {
+  const esp_err_t err = esp_wifi_connect();
+  if (err != ESP_OK && err != ESP_ERR_WIFI_NOT_STARTED) {
+    ESP_LOGW(kTag, "scheduled Stage LAN reconnect failed: %s",
+             esp_err_to_name(err));
+  }
+}
+
+void schedule_reconnect() {
+  if (g_reconnect_timer == nullptr) return;
+  stop_reconnect_timer();
+  const uint32_t delay_ms = g_reconnect_delay_ms;
+  const esp_err_t err = esp_timer_start_once(
+      g_reconnect_timer, static_cast<uint64_t>(delay_ms) * 1000ULL);
+  if (err == ESP_OK) {
+    g_reconnect_delay_ms =
+        stagecore_camera::wifi_recovery::next_reconnect_delay(delay_ms);
+  } else {
+    ESP_LOGW(kTag, "unable to schedule Stage LAN reconnect: %s",
+             esp_err_to_name(err));
+  }
+}
+#endif
+
 void event_handler(void *, esp_event_base_t base, int32_t id, void *) {
   if (base == WIFI_EVENT && id == WIFI_EVENT_STA_START) {
-    (void)esp_wifi_connect();
+#if STAGECORE_CAMERA_V2_FOUNDATION_C2
+    g_reconnect_delay_ms =
+        stagecore_camera::wifi_recovery::kReconnectInitialDelayMs;
+#endif
+    const esp_err_t err = esp_wifi_connect();
+#if STAGECORE_CAMERA_V2_FOUNDATION_C2
+    if (err != ESP_OK) schedule_reconnect();
+#else
+    (void)err;
+#endif
   } else if (base == WIFI_EVENT && id == WIFI_EVENT_STA_DISCONNECTED) {
     if (g_events != nullptr) xEventGroupClearBits(g_events, kConnectedBit);
-    // C1 has no Recovery AP. Keep retrying the already-provisioned Stage LAN;
-    // the proven Arduino stream image remains the provisioning/rollback image.
+#if STAGECORE_CAMERA_V2_FOUNDATION_C2
+    schedule_reconnect();
+#else
+    // C1 keeps its already-qualified retry behavior unchanged.
     (void)esp_wifi_connect();
+#endif
   } else if (base == IP_EVENT && id == IP_EVENT_STA_GOT_IP) {
+#if STAGECORE_CAMERA_V2_FOUNDATION_C2
+    g_reconnect_delay_ms =
+        stagecore_camera::wifi_recovery::kReconnectInitialDelayMs;
+    stop_reconnect_timer();
+#endif
     if (g_events != nullptr) xEventGroupSetBits(g_events, kConnectedBit);
   }
 }
@@ -47,6 +111,22 @@ esp_err_t connect_station(const WifiConfig &config, int timeout_ms) {
   if (g_events == nullptr) g_events = xEventGroupCreate();
   if (g_events == nullptr) return ESP_ERR_NO_MEM;
   xEventGroupClearBits(g_events, kConnectedBit);
+
+#if STAGECORE_CAMERA_V2_FOUNDATION_C2
+  if (g_reconnect_timer == nullptr) {
+    const esp_timer_create_args_t timer_args{
+        .callback = &reconnect_timer_callback,
+        .arg = nullptr,
+        .dispatch_method = ESP_TIMER_TASK,
+        .name = "stagecam-wifi",
+        .skip_unhandled_events = true,
+    };
+    err = esp_timer_create(&timer_args, &g_reconnect_timer);
+    if (err != ESP_OK) return err;
+  }
+  g_reconnect_delay_ms =
+      stagecore_camera::wifi_recovery::kReconnectInitialDelayMs;
+#endif
 
   if (!g_wifi_initialized) {
     if (esp_netif_create_default_wifi_sta() == nullptr) return ESP_FAIL;

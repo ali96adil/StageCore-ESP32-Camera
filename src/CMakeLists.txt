@@ -1,15 +1,23 @@
-if(STAGECORE_CAMERA_V2_FOUNDATION_C1)
+if(STAGECORE_CAMERA_V2_FOUNDATION_C1 OR STAGECORE_CAMERA_V2_FOUNDATION_C2)
+  set(STAGECORE_CAMERA_V2_SRCS
+    "v2_foundation/main.cpp"
+    "v2_foundation/config_store.cpp"
+    "v2_foundation/device_identity.cpp"
+    "v2_foundation/trusted_clock.cpp"
+    "v2_foundation/hub_discovery.cpp"
+    "v2_foundation/hub_security.cpp"
+    "v2_foundation/network_station.cpp"
+    "v2_foundation/stage_device_runtime.cpp"
+  )
+  if(STAGECORE_CAMERA_V2_FOUNDATION_C2)
+    list(APPEND STAGECORE_CAMERA_V2_SRCS
+      "v2_foundation/provisioning.cpp"
+    )
+  endif()
   idf_component_register(
-    SRCS
-      "v2_foundation/main.cpp"
-      "v2_foundation/config_store.cpp"
-      "v2_foundation/device_identity.cpp"
-      "v2_foundation/trusted_clock.cpp"
-      "v2_foundation/hub_discovery.cpp"
-      "v2_foundation/hub_security.cpp"
-      "v2_foundation/network_station.cpp"
-      "v2_foundation/stage_device_runtime.cpp"
+    SRCS ${STAGECORE_CAMERA_V2_SRCS}
     INCLUDE_DIRS
+      "."
       "v2_foundation"
   )
 else()
