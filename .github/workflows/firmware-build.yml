@@ -43,7 +43,7 @@ jobs:
         run: python -m unittest tests/v2_foundation_contract_test.py -v
       - name: Test secure v2 Foundation C2 maintenance contract
         run: python -m unittest tests/v2_foundation_c2_contract_test.py -v
-      - name: Test secure v2 Foundation C3 scaffold contract
+      - name: Test secure v2 Foundation C3 camera service contract
         run: python -m unittest tests/v2_foundation_c3_contract_test.py -v
       - name: Build serial hardware probe
         run: pio run -e esp32cam_probe
@@ -55,7 +55,7 @@ jobs:
         run: pio run -e esp32cam_v2_foundation_c2
       - name: Verify C1/C2 did not resolve the camera component
         run: test ! -d managed_components/espressif__esp32-camera
-      - name: Build source-only secure v2 Foundation C3 camera scaffold
+      - name: Build source-only secure v2 Foundation C3 camera service candidate
         run: pio run -e esp32cam_v2_foundation_c3
       - name: Verify C3 resolved the camera component
         run: test -f managed_components/espressif__esp32-camera/idf_component.yml
@@ -135,10 +135,13 @@ jobs:
             echo "environment=$ENV_NAME"
             echo "board=esp32cam"
             echo "framework=espidf"
-            echo "qualification=SOURCE_ONLY_C3_SCAFFOLD"
+            echo "qualification=SOURCE_ONLY_C3"
             echo "camera_component=espressif/esp32-camera@2.1.8"
-            echo "camera_stream=false"
-            echo "flash_output=false"
+            echo "camera_stream=true"
+            echo "camera_stream_port=81"
+            echo "camera_relay_contract=one-upstream"
+            echo "flash_output=true-safe-default-off"
+            echo "physical_qualification=false"
             echo "setup_ap_maintenance=authenticated_v2"
           } > "$OUT/BUILDINFO"
 
@@ -180,10 +183,10 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-      - name: Upload secure v2 Foundation C3 camera scaffold
+      - name: Upload secure v2 Foundation C3 camera service candidate
         uses: actions/upload-artifact@v4
         with:
-          name: esp32cam-v2-foundation-c3-scaffold-source-only
+          name: esp32cam-v2-foundation-c3-camera-source-only
           path: ${{ runner.temp }}/esp32cam_v2_foundation_c3/
           if-no-files-found: error
           retention-days: 7
