@@ -1,3 +1,4 @@
+#ifdef STAGECORE_FOUNDATION_V2_CANDIDATE
 #include "foundation_runtime.h"
 
 #include <cmath>
@@ -400,3 +401,4 @@ cleanup:
 }
 
 }  // namespace stagecore_camera::foundation
+#endif  // STAGECORE_FOUNDATION_V2_CANDIDATE
