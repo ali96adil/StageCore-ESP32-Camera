@@ -9,3 +9,7 @@ __pycache__/
 !*.example
 secrets.*
 *.local.ini
+managed_components/
+dependencies.lock
+sdkconfig.*
+!sdkconfig.v2_foundation.defaults
