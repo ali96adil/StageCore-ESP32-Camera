@@ -4,7 +4,7 @@
 
 #include "esp_err.h"
 
-namespace stagecore_camera_v2 {
+namespace stagecore {
 
 struct WifiConfig {
   std::string ssid;
@@ -25,4 +25,4 @@ esp_err_t load_wifi_config(WifiConfig *config);
 esp_err_t load_hub_binding(HubBinding *binding);
 esp_err_t save_hub_binding(const HubBinding &binding);
 
-}  // namespace stagecore_camera_v2
+}  // namespace stagecore
