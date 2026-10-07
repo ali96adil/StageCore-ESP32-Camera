@@ -28,10 +28,20 @@ class V2FoundationC1Contract(unittest.TestCase):
         self.assertNotIn('"main.cpp"\n', cmake.replace('"v2_foundation/main.cpp"', ""))
 
     def test_candidate_has_no_camera_or_flash_execution_path(self):
-        source = "\n".join(
-            path.read_text()
-            for path in V2.glob("*.cpp")
+        # C3 adds camera_service.cpp to the same source directory, but C1 never
+        # compiles it. Check only the C1 source set instead of every future
+        # candidate file that happens to live under v2_foundation/.
+        c1_files = (
+            "main.cpp",
+            "config_store.cpp",
+            "device_identity.cpp",
+            "trusted_clock.cpp",
+            "hub_discovery.cpp",
+            "hub_security.cpp",
+            "network_station.cpp",
+            "stage_device_runtime.cpp",
         )
+        source = "\n".join((V2 / name).read_text() for name in c1_files)
         self.assertNotIn("esp_camera_init", source)
         self.assertNotIn("esp_camera_fb_get", source)
         self.assertNotIn("kFlashPin", source)
