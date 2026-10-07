@@ -1,3 +1,4 @@
+#include <cstdint>
 #include <string>
 
 #include "config_store.h"
