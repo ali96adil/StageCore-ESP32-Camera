@@ -28,7 +28,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Install pinned PlatformIO
-        run: python -m pip install platformio==6.1.18
+        run: python -m pip install platformio==6.1.18 intelhex==2.3.0
       - name: Test Wi-Fi recovery policy
         run: g++ -std=c++17 -Wall -Wextra -Werror -Isrc tests/wifi_recovery_policy_test.cpp -o /tmp/wifi-recovery-policy && /tmp/wifi-recovery-policy
       - name: Test shared provisioning AP password contract
