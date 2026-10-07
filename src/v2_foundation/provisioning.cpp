@@ -40,7 +40,7 @@ std::string effective_setup_ap_password() {
   if (err == ESP_OK && stored.size() >= 8 && stored.size() <= 63) {
     return stored;
   }
-  if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND) {
+  if (err != ESP_OK) {
     ESP_LOGW(kTag,
              "stored Setup AP credential unavailable; using compiled fallback");
   }
