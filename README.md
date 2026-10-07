@@ -30,6 +30,7 @@ The StageCore repository owns relay/discovery orchestration and cue actions. The
 
 - `esp32cam_probe`: serial hardware probe, already physically qualified on the photographed unit.
 - `esp32cam_stream`: proposed single-consumer HTTP MJPEG + local Wi-Fi provisioning; see [Wi-Fi/MJPEG bring-up](docs/wifi-mjpeg-bringup.md). **Do not infer physical streaming PASS from CI compilation.**
+- `esp32cam_v2_foundation_c1`: **source-only, non-camera candidate** for persistent UUID/P-256 identity, pinned Hub trust, authenticated pairing, and inventory-only `stagecore.device/2`. It intentionally has no camera capture, MJPEG, flash-output, Setup-AP mutation, Cue, or show-authority path.
 
 ## First milestone
 
@@ -50,3 +51,17 @@ No Flash/OTA instructions are provided until the board profile, partition layout
 ## Setup Wi-Fi access point
 
 First-run provisioning and saved-network recovery use a device-specific camera SSID with the shared StageCore setup password `12345678`. Serial Monitor is no longer required to discover a random AP password. The password may be overridden at build time with `STAGECORE_SETUP_AP_PASSWORD`; keep the same value across StageCore devices when using that override.
+
+
+## Firmware Foundation migration
+
+StageCore Firmware Foundation v1 is being integrated without replacing the
+physically proven rollback path. The current C1 candidate reads the Wi-Fi
+credentials already saved by `esp32cam_stream`, creates a persistent secure
+identity, pins one verified Hub, authenticates, and appears as a BLOCKER /
+UNASSIGNED v2 inventory device.
+
+C1 deliberately does **not** advertise
+`device.maintenance.setup-ap-password`. That capability is added only after
+this secure transport is source-qualified; the existing unauthenticated camera
+HTTP server remains forbidden from changing the Setup/Recovery AP password.
