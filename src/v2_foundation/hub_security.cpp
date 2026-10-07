@@ -18,6 +18,10 @@
 #define STAGECORE_FW_VERSION "0.2.0-dev.c1"
 #endif
 
+#ifndef STAGECORE_CAMERA_V2_FOUNDATION_C2
+#define STAGECORE_CAMERA_V2_FOUNDATION_C2 0
+#endif
+
 namespace stagecore {
 namespace {
 
@@ -130,9 +134,18 @@ std::string random_nonce_base64() {
 }
 
 cJSON *capabilities_json() {
-  // C1 is inventory-only. Do not advertise show, camera-control, OTA or
-  // Setup-AP maintenance authority until their dedicated slices are proven.
-  return cJSON_CreateArray();
+  cJSON *caps = cJSON_CreateArray();
+  if (caps == nullptr) return nullptr;
+#if STAGECORE_CAMERA_V2_FOUNDATION_C2
+  cJSON *setup_ap =
+      cJSON_CreateString("device.maintenance.setup-ap-password");
+  if (setup_ap == nullptr || !cJSON_AddItemToArray(caps, setup_ap)) {
+    if (setup_ap != nullptr) cJSON_Delete(setup_ap);
+    cJSON_Delete(caps);
+    return nullptr;
+  }
+#endif
+  return caps;
 }
 
 std::string print_json(cJSON *root) {

@@ -1,4 +1,4 @@
-if(STAGECORE_CAMERA_V2_FOUNDATION_C1)
+if(STAGECORE_CAMERA_V2_FOUNDATION_C1 OR STAGECORE_CAMERA_V2_FOUNDATION_C2)
   idf_component_register(
     SRCS
       "v2_foundation/main.cpp"

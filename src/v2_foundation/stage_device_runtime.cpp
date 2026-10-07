@@ -1,5 +1,6 @@
 #include "stage_device_runtime.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
@@ -7,6 +8,7 @@
 #include <string>
 
 #include "cJSON.h"
+#include "config_store.h"
 #include "esp_log.h"
 #include "esp_system.h"
 #include "esp_timer.h"
@@ -14,9 +16,14 @@
 #include "esp_wifi.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
+#include "freertos/semphr.h"
 
 #ifndef STAGECORE_FW_VERSION
 #define STAGECORE_FW_VERSION "0.2.0-dev.c1"
+#endif
+
+#ifndef STAGECORE_CAMERA_V2_FOUNDATION_C2
+#define STAGECORE_CAMERA_V2_FOUNDATION_C2 0
 #endif
 
 namespace stagecore {
@@ -29,12 +36,19 @@ constexpr EventBits_t kConnectedBit = BIT0;
 constexpr EventBits_t kAssignmentBit = BIT1;
 constexpr EventBits_t kDisconnectedBit = BIT2;
 constexpr EventBits_t kProtocolErrorBit = BIT3;
+#if STAGECORE_CAMERA_V2_FOUNDATION_C2
+constexpr EventBits_t kSetupAPMaintenanceBit = BIT4;
+#endif
 constexpr size_t kMaxInboundBytes = 8192;
 constexpr int kReadyTimeoutMs = 5000;
 constexpr int kObservationPeriodMs = 10000;
 
 struct RuntimeContext {
   EventGroupHandle_t events = nullptr;
+#if STAGECORE_CAMERA_V2_FOUNDATION_C2
+  SemaphoreHandle_t maintenance_lock = nullptr;
+  std::string pending_setup_ap_frame;
+#endif
   std::string device_id;
   std::string inbound;
   int expected_payload = 0;
@@ -86,9 +100,18 @@ std::string print_json(cJSON *root) {
 }
 
 cJSON *capabilities_json() {
-  // C1 intentionally advertises no maintenance, stream, flash, OTA, Cue or
-  // show authority. It proves only secure identity + authenticated v2 inventory.
-  return cJSON_CreateArray();
+  cJSON *caps = cJSON_CreateArray();
+  if (caps == nullptr) return nullptr;
+#if STAGECORE_CAMERA_V2_FOUNDATION_C2
+  cJSON *setup_ap =
+      cJSON_CreateString("device.maintenance.setup-ap-password");
+  if (setup_ap == nullptr || !cJSON_AddItemToArray(caps, setup_ap)) {
+    if (setup_ap != nullptr) cJSON_Delete(setup_ap);
+    cJSON_Delete(caps);
+    return nullptr;
+  }
+#endif
+  return caps;
 }
 
 cJSON *observed_state_json() {
@@ -184,6 +207,26 @@ std::string make_observation(const VerifiedHub &hub,
   return out;
 }
 
+#if STAGECORE_CAMERA_V2_FOUNDATION_C2
+bool queue_setup_ap_maintenance(RuntimeContext *context,
+                                const std::string &text) {
+  if (context == nullptr || context->maintenance_lock == nullptr ||
+      context->events == nullptr || text.empty()) {
+    return false;
+  }
+  if (xSemaphoreTake(context->maintenance_lock, pdMS_TO_TICKS(50)) != pdTRUE) {
+    return false;
+  }
+  const bool accepted = context->pending_setup_ap_frame.empty();
+  if (accepted) context->pending_setup_ap_frame = text;
+  xSemaphoreGive(context->maintenance_lock);
+  if (accepted) {
+    xEventGroupSetBits(context->events, kSetupAPMaintenanceBit);
+  }
+  return accepted;
+}
+#endif
+
 bool handle_complete_text(RuntimeContext *context, const std::string &text) {
   if (context == nullptr) return false;
   cJSON *root = cJSON_ParseWithLength(text.data(), text.size());
@@ -197,8 +240,27 @@ bool handle_complete_text(RuntimeContext *context, const std::string &text) {
             cJSON_IsString(device) && device->valuestring != nullptr &&
             context->device_id == device->valuestring;
 
-  // C1 is deliberately inventory-only. Only an UNASSIGNED Hub-owned v2
-  // assignment is accepted. Any output/command/maintenance frame fails closed.
+#if STAGECORE_CAMERA_V2_FOUNDATION_C2
+  if (ok &&
+      std::strcmp(type->valuestring, "maintenance.setup_ap_password") == 0) {
+    int64_t generation = 0;
+    const cJSON *request_id =
+        cJSON_GetObjectItemCaseSensitive(root, "request_id");
+    const cJSON *operation =
+        cJSON_GetObjectItemCaseSensitive(root, "operation");
+    ok = context->assignment_epoch > 0 &&
+         positive_wire_integer(root, "connection_generation", &generation) &&
+         generation == context->connection_generation &&
+         cJSON_IsString(request_id) && request_id->valuestring != nullptr &&
+         std::strlen(request_id->valuestring) == 36 &&
+         cJSON_IsString(operation) && operation->valuestring != nullptr &&
+         (std::strcmp(operation->valuestring, "SET") == 0 ||
+          std::strcmp(operation->valuestring, "RESET_DEFAULT") == 0);
+    if (ok) ok = queue_setup_ap_maintenance(context, text);
+  } else
+#endif
+  // The Camera Foundation candidate remains UNASSIGNED and has no show/output
+  // authority. C2 adds maintenance only on the authenticated v2 connection.
   if (ok && std::strcmp(type->valuestring, "assignment.state") == 0) {
     const cJSON *state = cJSON_GetObjectItemCaseSensitive(root, "state");
     const cJSON *commands =
@@ -292,6 +354,108 @@ esp_err_t send_text(esp_websocket_client_handle_t client,
   return sent == static_cast<int>(message.size()) ? ESP_OK : ESP_FAIL;
 }
 
+#if STAGECORE_CAMERA_V2_FOUNDATION_C2
+bool take_setup_ap_maintenance(RuntimeContext *context, std::string *frame) {
+  if (context == nullptr || frame == nullptr ||
+      context->maintenance_lock == nullptr) {
+    return false;
+  }
+  if (xSemaphoreTake(context->maintenance_lock, pdMS_TO_TICKS(50)) != pdTRUE) {
+    return false;
+  }
+  const bool present = !context->pending_setup_ap_frame.empty();
+  if (present) {
+    *frame = std::move(context->pending_setup_ap_frame);
+    context->pending_setup_ap_frame.clear();
+  }
+  xSemaphoreGive(context->maintenance_lock);
+  if (present) {
+    xEventGroupClearBits(context->events, kSetupAPMaintenanceBit);
+  }
+  return present;
+}
+
+std::string make_setup_ap_maintenance_result(
+    const RuntimeContext &context,
+    const std::string &request_id,
+    const char *state,
+    const char *detail) {
+  cJSON *root = cJSON_CreateObject();
+  if (root == nullptr) return {};
+  cJSON_AddStringToObject(
+      root, "type", "maintenance.setup_ap_password.result");
+  cJSON_AddNumberToObject(root, "schema_version", 2);
+  cJSON_AddStringToObject(root, "device_id", context.device_id.c_str());
+  cJSON_AddNumberToObject(
+      root, "connection_generation",
+      static_cast<double>(context.connection_generation));
+  cJSON_AddStringToObject(root, "request_id", request_id.c_str());
+  cJSON_AddStringToObject(root, "maintenance_state", state);
+  cJSON_AddStringToObject(root, "detail", detail);
+  const std::string out = print_json(root);
+  cJSON_Delete(root);
+  return out;
+}
+
+esp_err_t process_setup_ap_maintenance(
+    RuntimeContext *context,
+    esp_websocket_client_handle_t client,
+    const std::string &frame) {
+  if (context == nullptr || client == nullptr || frame.empty()) {
+    return ESP_ERR_INVALID_ARG;
+  }
+
+  cJSON *root = cJSON_ParseWithLength(frame.data(), frame.size());
+  if (root == nullptr) return ESP_ERR_INVALID_RESPONSE;
+
+  const cJSON *request_id =
+      cJSON_GetObjectItemCaseSensitive(root, "request_id");
+  const cJSON *operation =
+      cJSON_GetObjectItemCaseSensitive(root, "operation");
+  const cJSON *password =
+      cJSON_GetObjectItemCaseSensitive(root, "password");
+  int64_t generation = 0;
+  const bool envelope_ok =
+      positive_wire_integer(root, "connection_generation", &generation) &&
+      generation == context->connection_generation &&
+      cJSON_IsString(request_id) && request_id->valuestring != nullptr &&
+      std::strlen(request_id->valuestring) == 36 &&
+      cJSON_IsString(operation) && operation->valuestring != nullptr;
+  if (!envelope_ok) {
+    cJSON_Delete(root);
+    return ESP_ERR_INVALID_RESPONSE;
+  }
+
+  esp_err_t apply_err = ESP_ERR_INVALID_ARG;
+  const char *detail = "Setup AP credential request rejected";
+  if (std::strcmp(operation->valuestring, "SET") == 0) {
+    if (cJSON_IsString(password) && password->valuestring != nullptr) {
+      std::string value = password->valuestring;
+      if (value.size() >= 8 && value.size() <= 63) {
+        apply_err = save_setup_ap_password(value);
+        detail = apply_err == ESP_OK
+                     ? "Setup AP credential updated"
+                     : "Setup AP credential could not be persisted";
+      }
+      std::fill(value.begin(), value.end(), '\0');
+    }
+  } else if (std::strcmp(operation->valuestring, "RESET_DEFAULT") == 0 &&
+             password == nullptr) {
+    apply_err = clear_setup_ap_password();
+    detail = apply_err == ESP_OK
+                 ? "Setup AP credential reset to shared default"
+                 : "Setup AP credential reset could not be persisted";
+  }
+
+  const std::string request = request_id->valuestring;
+  cJSON_Delete(root);
+  const std::string result = make_setup_ap_maintenance_result(
+      *context, request, apply_err == ESP_OK ? "APPLIED" : "REJECTED", detail);
+  if (result.empty()) return ESP_FAIL;
+  return send_text(client, result);
+}
+#endif
+
 }  // namespace
 
 esp_err_t run_camera_foundation_runtime(const VerifiedHub &hub,
@@ -306,8 +470,23 @@ esp_err_t run_camera_foundation_runtime(const VerifiedHub &hub,
 
   RuntimeContext context;
   context.events = xEventGroupCreate();
+#if STAGECORE_CAMERA_V2_FOUNDATION_C2
+  context.maintenance_lock = xSemaphoreCreateMutex();
+#endif
   context.device_id = identity.device_id();
-  if (context.events == nullptr) return ESP_ERR_NO_MEM;
+  if (context.events == nullptr
+#if STAGECORE_CAMERA_V2_FOUNDATION_C2
+      || context.maintenance_lock == nullptr
+#endif
+  ) {
+#if STAGECORE_CAMERA_V2_FOUNDATION_C2
+    if (context.maintenance_lock != nullptr) {
+      vSemaphoreDelete(context.maintenance_lock);
+    }
+#endif
+    if (context.events != nullptr) vEventGroupDelete(context.events);
+    return ESP_ERR_NO_MEM;
+  }
 
   char uri[192];
   std::snprintf(uri, sizeof(uri),
@@ -391,7 +570,12 @@ esp_err_t run_camera_foundation_runtime(const VerifiedHub &hub,
     int64_t last_observation_us = esp_timer_get_time();
     while (true) {
       bits = xEventGroupWaitBits(
-          context.events, kDisconnectedBit | kProtocolErrorBit,
+          context.events,
+          kDisconnectedBit | kProtocolErrorBit
+#if STAGECORE_CAMERA_V2_FOUNDATION_C2
+              | kSetupAPMaintenanceBit
+#endif
+          ,
           pdFALSE, pdFALSE, pdMS_TO_TICKS(250));
       if (bits & kProtocolErrorBit) {
         err = ESP_ERR_INVALID_RESPONSE;
@@ -401,6 +585,16 @@ esp_err_t run_camera_foundation_runtime(const VerifiedHub &hub,
         err = ESP_ERR_INVALID_STATE;
         break;
       }
+#if STAGECORE_CAMERA_V2_FOUNDATION_C2
+      if (bits & kSetupAPMaintenanceBit) {
+        std::string setup_ap_frame;
+        if (take_setup_ap_maintenance(&context, &setup_ap_frame)) {
+          err = process_setup_ap_maintenance(
+              &context, client, setup_ap_frame);
+          if (err != ESP_OK) break;
+        }
+      }
+#endif
       const int64_t now = esp_timer_get_time();
       if (now - last_observation_us >=
           static_cast<int64_t>(kObservationPeriodMs) * 1000LL) {
@@ -414,6 +608,9 @@ esp_err_t run_camera_foundation_runtime(const VerifiedHub &hub,
 cleanup:
   (void)esp_websocket_client_stop(client);
   esp_websocket_client_destroy(client);
+#if STAGECORE_CAMERA_V2_FOUNDATION_C2
+  vSemaphoreDelete(context.maintenance_lock);
+#endif
   vEventGroupDelete(context.events);
   return err;
 }

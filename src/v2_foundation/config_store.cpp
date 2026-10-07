@@ -15,6 +15,7 @@ constexpr char kPasswordKey[] = "password";
 constexpr char kHubIDKey[] = "hub_id";
 constexpr char kHubFingerprintKey[] = "hub_fp";
 constexpr char kHubTLSKey[] = "hub_tls";
+constexpr char kSetupAPPasswordKey[] = "setup_ap_pass";
 
 esp_err_t read_string(nvs_handle_t handle, const char *key, std::string *value,
                       bool *found = nullptr) {
@@ -43,6 +44,11 @@ esp_err_t write_string(nvs_handle_t handle, const char *key,
   return nvs_set_str(handle, key, value.c_str());
 }
 
+esp_err_t erase_key_if_present(nvs_handle_t handle, const char *key) {
+  const esp_err_t err = nvs_erase_key(handle, key);
+  return err == ESP_ERR_NVS_NOT_FOUND ? ESP_OK : err;
+}
+
 }  // namespace
 
 bool WifiConfig::complete() const {
@@ -69,6 +75,47 @@ esp_err_t load_wifi_config(WifiConfig *config) {
   if (err == ESP_OK) err = read_string(handle, kPasswordKey, &loaded.password);
   nvs_close(handle);
   if (err == ESP_OK) *config = std::move(loaded);
+  return err;
+}
+
+esp_err_t load_setup_ap_password(std::string *password) {
+  if (password == nullptr) return ESP_ERR_INVALID_ARG;
+  nvs_handle_t handle;
+  esp_err_t err = nvs_open(kV2Namespace, NVS_READONLY, &handle);
+  if (err == ESP_ERR_NVS_NOT_FOUND) {
+    password->clear();
+    return ESP_OK;
+  }
+  if (err != ESP_OK) return err;
+  err = read_string(handle, kSetupAPPasswordKey, password);
+  nvs_close(handle);
+  if (err != ESP_OK) return err;
+  if (!password->empty() && (password->size() < 8 || password->size() > 63)) {
+    password->clear();
+    return ESP_ERR_INVALID_STATE;
+  }
+  return ESP_OK;
+}
+
+esp_err_t save_setup_ap_password(const std::string &password) {
+  if (password.size() < 8 || password.size() > 63) return ESP_ERR_INVALID_ARG;
+  nvs_handle_t handle;
+  esp_err_t err = nvs_open(kV2Namespace, NVS_READWRITE, &handle);
+  if (err != ESP_OK) return err;
+  err = write_string(handle, kSetupAPPasswordKey, password);
+  if (err == ESP_OK) err = nvs_commit(handle);
+  nvs_close(handle);
+  return err;
+}
+
+esp_err_t clear_setup_ap_password() {
+  nvs_handle_t handle;
+  esp_err_t err = nvs_open(kV2Namespace, NVS_READWRITE, &handle);
+  if (err == ESP_ERR_NVS_NOT_FOUND) return ESP_OK;
+  if (err != ESP_OK) return err;
+  err = erase_key_if_present(handle, kSetupAPPasswordKey);
+  if (err == ESP_OK) err = nvs_commit(handle);
+  nvs_close(handle);
   return err;
 }
 
