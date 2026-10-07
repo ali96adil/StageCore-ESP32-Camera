@@ -1,0 +1,9 @@
+file(GLOB_RECURSE STAGECORE_CAMERA_SOURCES
+    "${CMAKE_CURRENT_LIST_DIR}/*.c"
+    "${CMAKE_CURRENT_LIST_DIR}/*.cpp"
+)
+
+idf_component_register(
+    SRCS ${STAGECORE_CAMERA_SOURCES}
+    INCLUDE_DIRS "."
+)
