@@ -24,26 +24,6 @@ jobs:
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
-          ENV_NAME="esp32cam_v2_foundation_c2"
-          SRC=".pio/build/$ENV_NAME/firmware.bin"
-          test -f "$SRC"
-          OUT="$RUNNER_TEMP/$ENV_NAME"
-          rm -rf "$OUT"
-          mkdir -p "$OUT"
-          cp "$SRC" "$OUT/firmware.bin"
-          sha256sum "$OUT/firmware.bin" > "$OUT/SHA256SUMS"
-          {
-            echo "source_revision=$EXPECTED_SHA"
-            echo "platformio=6.1.18"
-            echo "environment=$ENV_NAME"
-            echo "board=esp32cam"
-            echo "framework=espidf"
-            echo "qualification=SOURCE_ONLY_C2"
-            echo "camera_stream=false"
-            echo "flash_output=false"
-            echo "setup_ap_maintenance=authenticated_v2"
-          } > "$OUT/BUILDINFO"
-
           test -z "$(git status --porcelain --untracked-files=all)"
       - name: Python
         uses: actions/setup-python@v5
@@ -107,6 +87,26 @@ jobs:
             echo "qualification=SOURCE_ONLY_C1"
             echo "camera_stream=false"
             echo "flash_output=false"
+          } > "$OUT/BUILDINFO"
+
+          ENV_NAME="esp32cam_v2_foundation_c2"
+          SRC=".pio/build/$ENV_NAME/firmware.bin"
+          test -f "$SRC"
+          OUT="$RUNNER_TEMP/$ENV_NAME"
+          rm -rf "$OUT"
+          mkdir -p "$OUT"
+          cp "$SRC" "$OUT/firmware.bin"
+          sha256sum "$OUT/firmware.bin" > "$OUT/SHA256SUMS"
+          {
+            echo "source_revision=$EXPECTED_SHA"
+            echo "platformio=6.1.18"
+            echo "environment=$ENV_NAME"
+            echo "board=esp32cam"
+            echo "framework=espidf"
+            echo "qualification=SOURCE_ONLY_C2"
+            echo "camera_stream=false"
+            echo "flash_output=false"
+            echo "setup_ap_maintenance=authenticated_v2"
           } > "$OUT/BUILDINFO"
 
           DIRTY="$(git status --porcelain --untracked-files=all)"
