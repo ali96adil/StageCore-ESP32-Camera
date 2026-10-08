@@ -1,11 +1,19 @@
 # C3 attended physical qualification
 
-Status: **SOURCE QUALIFIED / PHYSICAL QUALIFICATION NOT YET RUN**.
+Status: **SOURCE QUALIFIED / PHYSICAL QUALIFICATION NOT YET RUN**. Do not flash a new image until the specific GitHub CI run and local generated C3 partition table are verified.
 
 Canonical source image:
-- Camera main commit: `e57392aa0f9867567b414838f148ac6c7e28b787`
-- Main Firmware build: **#159 PASS**
+- Camera main commit: `e57392aa0f9867567b414838f148ac6c7e28b787` (older baseline, **NOT** the migration candidate).
+- Candidate: Draft PR #20, branch `chore/foundation-tls-qualification-20261008` including the legacy layout fix.
+- Main Firmware build: **#159 PASS** is not sufficient to qualify the new candidate; check its exact-commit PR CI.
 - Build target: `esp32cam_v2_foundation_c3`
+- The 2026-10-08 physical backup has SHA-256 `edbe87a619e181a43fde59388ccafa3160addee6896cbdabdec960ff4a1f8d03` and size 4,194,304 bytes. Keep this image private; it contains credentials.
+
+### Required partition migration check
+
+The original Arduino 4MB camera dump has NVS at 0x9000/0x5000, otadata 0xe000/0x2000, OTA app0 0x10000/0x300000, SPIFFS 0x310000/0xe0000 and coredump 0x3f0000/0x10000. The default ESP-IDF single-app layout used by C3 **overlapped live OTA metadata**. The C3 candidate now requires `partitions_camera_legacy.csv` and `tests/c3_legacy_partition_test.py` to validate its *generated* `partitions.bin`. A passing CI on an older SHA is not acceptable. **Do not use erase-flash or other destructive flashing commands.**
+
+The backup was obtained through ROM `esptool --no-stub read-flash` because CH340/stub transfers were unstable. A verified backup plus matching partition offsets is a prerequisite, not proof that UART flashing, boot, Wi-Fi credentials or TLS runtime will work. Keep a tested rollback path and use attended bench testing only.
 
 The existing Arduino `esp32cam_stream` firmware remains the rollback path until
 this checklist is completed on the real camera.
@@ -28,19 +36,23 @@ this checklist is completed on the real camera.
 On the Mac:
 
 ```sh
-cd ~/StageCore-ESP32-Camera
+cd ~/StageCore-Camera-C3-qualification-20261008
 git fetch origin
-git switch --detach e57392aa0f9867567b414838f148ac6c7e28b787
+git switch chore/foundation-tls-qualification-20261008
+git pull --ff-only
 
-source ~/stagecore-cam-probe-venv/bin/activate
+source ~/.venv-pio/bin/activate
+# Re-generate the C3 SDK config after changing partition defaults.
+# Check the exact source revision and CI PASS before taking the next step.
 pio run -e esp32cam_v2_foundation_c3
+python3 -m unittest tests/c3_legacy_partition_test.py -v
 
 ls /dev/cu.*
 pio run -e esp32cam_v2_foundation_c3 -t upload --upload-port /dev/cu.<verified-port>
 pio device monitor -p /dev/cu.<verified-port> -b 115200
 ```
 
-Use the verified programmer port only. Do not guess a serial device.
+**PAUSE HERE** until the migration gate, physical flash/power setup, exact SHA/CI, and safe serial method have been reviewed. Use the verified programmer port only; it may change between unplug/replug. Do not guess a serial device.
 
 ## 2. Boot / identity / Stage LAN
 
