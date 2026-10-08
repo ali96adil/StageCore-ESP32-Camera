@@ -3,6 +3,7 @@
 
 #include "config_store.h"
 #include "device_identity.h"
+#include "foundation_contract.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -78,6 +79,18 @@ std::string display_name(const std::string &device_id) {
   return "StageCore Camera " + suffix;
 }
 
+stagecore::FoundationDeviceDescriptor foundation_descriptor() {
+  stagecore::FoundationDeviceDescriptor descriptor;
+  descriptor.hostname_prefix = "stagecore-camera-";
+  descriptor.platform = "esp32";
+  descriptor.architecture = "xtensa";
+  descriptor.firmware_version = STAGECORE_FW_VERSION;
+#if STAGECORE_CAMERA_V2_FOUNDATION_C2
+  descriptor.capabilities = {stagecore::kSetupAPPasswordCapability};
+#endif
+  return descriptor;
+}
+
 }  // namespace
 
 extern "C" void app_main(void) {
@@ -107,6 +120,9 @@ extern "C" void app_main(void) {
   if (identity.LoadOrCreate() != ESP_OK) {
     hold_safe_failure("persistent UUID/P-256 identity unavailable");
   }
+  stagecore::FoundationStore &foundation = stagecore::foundation_store();
+  const stagecore::FoundationDeviceDescriptor descriptor =
+      foundation_descriptor();
   const std::string name = display_name(identity.device_id());
   ESP_LOGI(kTag, "device_id=%s", identity.device_id().c_str());
 
@@ -169,7 +185,7 @@ extern "C" void app_main(void) {
     }
 
     stagecore::VerifiedHub hub;
-    if (stagecore::discover_and_verify_hub(&hub) != ESP_OK) {
+    if (stagecore::discover_and_verify_hub(&foundation, &hub) != ESP_OK) {
       ESP_LOGW(kTag, "verified StageCore Hub unavailable; retrying");
       vTaskDelay(pdMS_TO_TICKS(3000));
       continue;
@@ -177,7 +193,7 @@ extern "C" void app_main(void) {
 
     stagecore::RuntimeCredential credential;
     if (stagecore::ensure_paired_and_authenticate(
-            hub, &identity, name, &credential) != ESP_OK) {
+            hub, &identity, descriptor, name, &credential) != ESP_OK) {
       ESP_LOGW(kTag, "Hub pairing/authentication unavailable; retrying");
       vTaskDelay(pdMS_TO_TICKS(3000));
       continue;

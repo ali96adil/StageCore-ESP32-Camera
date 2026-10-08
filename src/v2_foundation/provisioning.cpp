@@ -7,6 +7,7 @@
 #include <string>
 
 #include "config_store.h"
+#include "foundation_contract.h"
 #include "esp_event.h"
 #include "esp_http_server.h"
 #include "esp_log.h"
@@ -17,17 +18,12 @@
 #include "freertos/task.h"
 #include "network_station.h"
 
-#ifndef STAGECORE_SETUP_AP_PASSWORD
-#define STAGECORE_SETUP_AP_PASSWORD "12345678"
-#endif
-
 namespace stagecore {
 namespace {
 
 constexpr char kTag[] = "stagecam-v2-setup";
-constexpr char kSetupApPassword[] = STAGECORE_SETUP_AP_PASSWORD;
-static_assert(sizeof(kSetupApPassword) - 1 >= 8 &&
-                  sizeof(kSetupApPassword) - 1 <= 63,
+static_assert(sizeof(kDefaultSetupAPPassword) - 1 >= 8 &&
+                  sizeof(kDefaultSetupAPPassword) - 1 <= 63,
               "StageCore setup AP password must be 8-63 bytes");
 
 struct PortalContext {
@@ -35,16 +31,13 @@ struct PortalContext {
 };
 
 std::string effective_setup_ap_password() {
-  std::string stored;
-  const esp_err_t err = load_setup_ap_password(&stored);
-  if (err == ESP_OK && stored.size() >= 8 && stored.size() <= 63) {
-    return stored;
-  }
-  if (err != ESP_OK) {
-    ESP_LOGW(kTag,
-             "stored Setup AP credential unavailable; using compiled fallback");
-  }
-  return kSetupApPassword;
+  std::string password;
+  const esp_err_t err =
+      foundation_store().EffectiveSetupAPPassword(&password);
+  if (err == ESP_OK) return password;
+  ESP_LOGW(kTag,
+           "stored Setup AP credential unavailable; using canonical fallback");
+  return kDefaultSetupAPPassword;
 }
 
 std::string id_suffix(const std::string &device_id) {
