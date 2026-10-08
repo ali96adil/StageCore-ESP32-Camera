@@ -1,0 +1,9 @@
+# Physical 4MB ESP32-CAM Arduino backup partition layout (2026-10-08).
+# Preserve ALL existing offsets/sizes/subtypes, especially NVS and OTA metadata.
+# No phy_init partition: PHY init data remains embedded in firmware.
+# Name,     Type, SubType, Offset,   Size,      Flags
+nvs,        data, nvs,     0x9000,   0x5000,
+otadata,    data, ota,     0xe000,   0x2000,
+app0,       app,  ota_0,   0x10000,  0x300000,
+spiffs,     data, spiffs,  0x310000, 0xe0000,
+coredump,   data, coredump,0x3f0000, 0x10000,

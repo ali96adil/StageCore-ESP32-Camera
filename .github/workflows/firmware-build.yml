@@ -61,6 +61,8 @@ jobs:
         run: pio run -e esp32cam_v2_foundation_c3
       - name: Verify C3 resolved the camera component
         run: test -f managed_components/espressif__esp32-camera/idf_component.yml
+      - name: Validate C3 partition map against physically observed Arduino layout
+        run: python -m unittest tests/c3_legacy_partition_test.py -v
       - name: Stage exact firmware artifacts
         shell: bash
         run: |

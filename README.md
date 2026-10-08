@@ -68,3 +68,28 @@ The camera HTTP service remains unable to mutate Wi-Fi or Setup/Recovery AP
 credentials. Password maintenance stays authenticated and separate from
 camera/flash/Cue/show authority. The remaining gate is attended C3 physical
 qualification, not additional Foundation implementation.
+
+
+## TLS Foundation qualification candidate (2026-10-08)
+
+This **Draft PR branch only** pins the Foundation TLS bootstrap fix from StageCore
+[PR #447](https://github.com/ali96adil/StageCore/pull/447), commit
+`4495a381cc40f06f44e0a16da4a4dc82a9bceb6c`.
+It addresses the ESP-IDF self-signed Hub TLS setup failure encountered on
+StageLaser. This is not a production firmware release or permission to flash.
+
+Source build checks (no device update):
+
+```sh
+pio run -e esp32cam_v2_foundation_c3
+```
+
+C3 is source-qualified, NOT physically qualified for replacement of the Arduino show stream. Keep the proven streaming firmware as the rollback candidate; preserve the existing Wi-Fi/device identity and verify the one-upstream MJPEG, flash OFF, Media Relay and four tablets on attended bench.
+
+**Security gate:** The initial discovery fingerprint is advertised on the local
+network. Until the Hub fingerprint is verified through an independently trusted
+channel or an authenticated prior binding, a spoofed first discovery must not
+be treated as authenticated trust. Review wrong-pin failure, pairing,
+reconnect, and credential handling before merging the Foundation fix.
+
+Pass CI and test all affected board targets before any attended physical flash.

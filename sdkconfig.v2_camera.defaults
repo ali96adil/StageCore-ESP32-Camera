@@ -8,3 +8,9 @@ CONFIG_SPIRAM_SUPPORT=y
 CONFIG_ESP32_SPIRAM_SUPPORT=y
 CONFIG_SPIRAM_SPEED_80M=y
 CONFIG_ESPTOOLPY_FLASHFREQ_80M=y
+
+# C3 must preserve the physically observed legacy Arduino app0/OTA/NVS map.
+# This is intentionally different from the generic C1/C2 single-app layout.
+# CONFIG_PARTITION_TABLE_SINGLE_APP_LARGE is not set
+CONFIG_PARTITION_TABLE_CUSTOM=y
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions_camera_legacy.csv"
