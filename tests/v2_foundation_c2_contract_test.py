@@ -3,6 +3,7 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 V2 = ROOT / "src" / "v2_foundation"
+FOUNDATION_SHA = "d6946da3f003e8c0c2a72216804ef2035bf1288c"
 
 
 class V2FoundationC2Contract(unittest.TestCase):
@@ -25,12 +26,14 @@ class V2FoundationC2Contract(unittest.TestCase):
         header = (V2 / "config_store.h").read_text()
         store = (V2 / "config_store.cpp").read_text()
         runtime = (V2 / "stage_device_runtime.cpp").read_text()
+        manifest = (ROOT / "src" / "idf_component.yml").read_text()
 
-        self.assertIn('kSetupAPPasswordKey[] = "setup_ap_pass"', store)
         self.assertIn("load_setup_ap_password", header)
         self.assertIn("save_setup_ap_password", header)
         self.assertIn("clear_setup_ap_password", header)
-        self.assertIn("nvs_commit(handle)", store)
+        self.assertIn("SaveSetupAPPasswordOverride", store)
+        self.assertIn("ResetSetupAPPasswordToDefault", store)
+        self.assertIn(f"version: {FOUNDATION_SHA}", manifest)
 
         self.assertIn("device.maintenance.setup-ap-password", runtime)
         self.assertIn("maintenance.setup_ap_password", runtime)
@@ -47,9 +50,9 @@ class V2FoundationC2Contract(unittest.TestCase):
         store = (V2 / "config_store.cpp").read_text()
         cmake = (ROOT / "src" / "CMakeLists.txt").read_text()
 
-        self.assertIn('#define STAGECORE_SETUP_AP_PASSWORD "12345678"', portal)
-        self.assertIn("effective_setup_ap_password", portal)
-        self.assertIn("load_setup_ap_password", portal)
+        self.assertIn('#include "foundation_contract.h"', portal)
+        self.assertIn("kDefaultSetupAPPassword", portal)
+        self.assertIn("foundation_store().EffectiveSetupAPPassword", portal)
         self.assertIn("WIFI_AUTH_WPA2_PSK", portal)
         self.assertIn("WIFI_MODE_APSTA", portal)
         self.assertIn("save_wifi_config", portal)
@@ -59,6 +62,7 @@ class V2FoundationC2Contract(unittest.TestCase):
         self.assertIn("nvs_open(kCameraNamespace, NVS_READWRITE", store)
         self.assertIn("if(STAGECORE_CAMERA_V2_FOUNDATION_C2)", cmake)
         self.assertIn('"v2_foundation/provisioning.cpp"', cmake)
+        self.assertNotIn("STAGECORE_SETUP_AP_PASSWORD", portal)
         self.assertNotIn("password=%s", portal)
         self.assertNotIn("temporary AP password", portal)
 
@@ -93,9 +97,9 @@ class V2FoundationC2Contract(unittest.TestCase):
         ):
             self.assertNotIn(forbidden, maintenance)
 
-        security = (V2 / "hub_security.cpp").read_text()
-        self.assertIn("device.maintenance.setup-ap-password", security)
-        self.assertIn("#if STAGECORE_CAMERA_V2_FOUNDATION_C2", security)
+        main = (V2 / "main.cpp").read_text()
+        self.assertIn("kSetupAPPasswordCapability", main)
+        self.assertIn("#if STAGECORE_CAMERA_V2_FOUNDATION_C2", main)
 
 
 if __name__ == "__main__":

@@ -3,6 +3,7 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 V2 = ROOT / "src" / "v2_foundation"
+FOUNDATION_SHA = "d6946da3f003e8c0c2a72216804ef2035bf1288c"
 
 
 class V2FoundationC1Contract(unittest.TestCase):
@@ -25,19 +26,13 @@ class V2FoundationC1Contract(unittest.TestCase):
         cmake = (ROOT / "src" / "CMakeLists.txt").read_text()
         self.assertIn("STAGECORE_CAMERA_V2_FOUNDATION_C1", cmake)
         self.assertIn('"v2_foundation/main.cpp"', cmake)
+        self.assertIn("stagecore_foundation", cmake)
         self.assertNotIn('"main.cpp"\n', cmake.replace('"v2_foundation/main.cpp"', ""))
 
     def test_candidate_has_no_camera_or_flash_execution_path(self):
-        # C3 adds camera_service.cpp to the same source directory, but C1 never
-        # compiles it. Check only the C1 source set instead of every future
-        # candidate file that happens to live under v2_foundation/.
         c1_files = (
             "main.cpp",
             "config_store.cpp",
-            "device_identity.cpp",
-            "trusted_clock.cpp",
-            "hub_discovery.cpp",
-            "hub_security.cpp",
             "network_station.cpp",
             "stage_device_runtime.cpp",
         )
@@ -49,21 +44,34 @@ class V2FoundationC1Contract(unittest.TestCase):
         self.assertNotIn("/api/v0/stream", source)
         self.assertNotIn("/api/v0/flash", source)
 
-    def test_identity_and_hub_trust_are_persistent(self):
-        identity = (V2 / "device_identity.cpp").read_text()
+    def test_identity_and_hub_trust_are_owned_by_pinned_foundation(self):
+        main = (V2 / "main.cpp").read_text()
         config = (V2 / "config_store.cpp").read_text()
-        discovery = (V2 / "hub_discovery.cpp").read_text()
-        self.assertIn('kNamespace[] = "stagecore_id"', identity)
-        self.assertIn("MBEDTLS_ECP_DP_SECP256R1", identity)
-        self.assertIn('kV2Namespace[] = "stagecore_camv2"', config)
-        self.assertIn("save_hub_binding", discovery)
-        self.assertIn("TLS certificate SHA-256 pin verified", discovery)
+        header = (V2 / "config_store.h").read_text()
+        manifest = (ROOT / "src" / "idf_component.yml").read_text()
+
+        self.assertIn("stagecore::DeviceIdentity identity", main)
+        self.assertIn("identity.LoadOrCreate()", main)
+        self.assertIn('#include "foundation_store.h"', header)
+        self.assertIn('FoundationStore store(kV2Namespace)', config)
+        self.assertIn("foundation_store().LoadHubBinding", config)
+        self.assertIn("foundation_store().SaveHubBinding", config)
+        self.assertIn("stagecore_foundation:", manifest)
+        self.assertIn(f"version: {FOUNDATION_SHA}", manifest)
+        for name in (
+            "device_identity.cpp", "device_identity.h",
+            "trusted_clock.cpp", "trusted_clock.h",
+            "hub_discovery.cpp", "hub_discovery.h",
+            "hub_security.cpp", "hub_security.h",
+        ):
+            self.assertFalse((V2 / name).exists(), name)
 
     def test_pairing_and_runtime_are_authenticated_v2_inventory_only(self):
-        security = (V2 / "hub_security.cpp").read_text()
+        main = (V2 / "main.cpp").read_text()
         runtime = (V2 / "stage_device_runtime.cpp").read_text()
-        self.assertIn('"P256_X963_SHA256"', security)
-        self.assertIn("/api/v1/companion/auth/sessions", security)
+        self.assertIn("ensure_paired_and_authenticate", main)
+        self.assertIn('descriptor.hostname_prefix = "stagecore-camera-"', main)
+        self.assertIn('descriptor.architecture = "xtensa"', main)
         self.assertIn('"stagecore.device/2"', runtime)
         self.assertIn('"stagecore.esp32-camera"', runtime)
         self.assertIn('"readiness", "BLOCKER"', runtime)
@@ -78,9 +86,13 @@ class V2FoundationC1Contract(unittest.TestCase):
         self.assertNotIn("STAGECORE_CAMERA_V2_FOUNDATION_C2", c1)
 
         runtime = (V2 / "stage_device_runtime.cpp").read_text()
-        security = (V2 / "hub_security.cpp").read_text()
+        main = (V2 / "main.cpp").read_text()
         self.assertIn("#if STAGECORE_CAMERA_V2_FOUNDATION_C2", runtime)
-        self.assertIn("#if STAGECORE_CAMERA_V2_FOUNDATION_C2", security)
+        self.assertIn("#if STAGECORE_CAMERA_V2_FOUNDATION_C2", main)
+        descriptor = main.split(
+            "stagecore::FoundationDeviceDescriptor foundation_descriptor()", 1
+        )[1].split("return descriptor;", 1)[0]
+        self.assertIn("kSetupAPPasswordCapability", descriptor)
 
 
 if __name__ == "__main__":
